@@ -24,25 +24,104 @@ len = 0.05; % desired stimulus length (s)
     if mod(nSamples,2) ~= 0 % force to be even number
         nSamples = nSamples + 1;
     end
-Stimulus = zeros(nSamples,obj.chansOut); % create a matrix of zeros
+    
+stimulus = zeros(nSamples,1); % create a vector of zeros
 offset = 0.003; % time delay of the click re: time zero (s)
 indx = round(offset *fs); % number of samples offset of click
-Stimulus(indx,1) = .99; % make a single impulse in channel 1
+
+stimulus1 = stimulus;
+%stimulus2 = stimulus;
+stimulus1(indx,1) = .75; % make a single impulse
+%stimulus2(indx,1) = .25;
+%stimulus2(indx+50,1) = .25; % make a single impulse
+stimulus2 = randn(nSamples,100) * .01;
+
 
 % 2) LOAD THE STIMULUS ----------------------------------------------------
-obj.objPlayrec.stimTrain.Ch1 = Stimulus; % load the stimulus
-obj.objPlayrec.stimTrain.Ch2 = zeros(size(Stimulus));
-obj.objPlayrec.nReps = 500; % number of times to play stimulus
+
+% Load Output:
+%   Load one vector at a time. Each vector is a channel of output.
+%        Use vector of zeros if desire an output channel with no output.
+%        Specify channel number for each (1 through maxN, where maxN is the maximum for the sound card)
+obj.setPlayList(stimulus1,2);
+obj.setPlayList(stimulus2,3);
+
+% Load Input:
+%   Specify channel number for each (1 through maxN, where maxN is the maximum for the sound card)
+%        For each, specify a label, mic sensitivity, and gain.
+%        Label is a string for idenfification and file saving purposes
+%        Mic sens is in V/Pa. If no microphone is used, set = 1.
+%        Gain refers to hardware gain applied prior to ADC by the sound card. Specify in dB.
+label = 'test6';
+micSens = 0.06;
+gain = 6;
+ch = 6;
+obj.setRecList(ch,label,micSens,gain);
+
+label = 'test5';
+micSens = 0.05;
+gain = 5;
+ch = 5;
+obj.setRecList(ch,label,micSens,gain);
+
+
+obj.objPlayrec.nReps = 100; % number of times to play stimulus
 
 % 3) PLAYBACK & RECORD ----------------------------------------------------
 obj.objPlayrec.run % run the stimulus
-if obj.killRun
+ok = obj.checkForErrors;
+if ~ok
    return
-end    
+end
+
+% channel = 1; % which channel to retrieve data from
+% [header,data] = obj.retrieveData(channel);
+% peaks(1) = max(mean(data,2))
+% 
+% 
+% obj.setPlayList(stimulus*1.2,ch);
+% obj.objPlayrec.run % run the stimulus
+% ok = obj.checkForErrors;
+% if ~ok
+%    return
+% end    
+
+
+
+
 
 % 4) RETRIEVE DATA ----------------------------------------------------
-channel = 1; % which channel to retrieve data from
-[header,data] = obj.retrieveData(channel);
+[header6,data6] = obj.retrieveData('Ch6');
+
+[header5,data5] = obj.retrieveData('Ch5');
+
+keyboard
+
+%obj.clearRecList
+obj.objPlayrec.playChanList
+obj.objPlayrec.loadingDock
+
+obj.clearPlayList(0)
+
+obj.objPlayrec.playChanList
+obj.objPlayrec.loadingDock
+
+
+keyboard
+
+
+obj.clearRecList([1,3])
+obj.objPlayrec.recChanList
+obj.objPlayrec.label
+obj.objPlayrec.ampGain
+obj.objPlayrec.micSens
+
+        
+
+
+keyboard
+return
+keyboard
 % Alternate way, if you want to get a list of the file names and then load
 % them later in the the experiment, instead of immediately.
 % fileName = obj.objPlayrec.savedFiles{1}; % the name of the file saved to input channel 1

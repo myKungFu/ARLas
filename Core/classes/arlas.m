@@ -8,11 +8,11 @@ classdef arlas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
-% Last Updated: December 7, 2016
+% Last Updated: January 10, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2016.12.07';
+    arlasVersion = '2017.01.10';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -126,6 +126,13 @@ methods
             OK = 0;
         end
         if exist(obj.map.data,'dir') ~= 7
+            try 
+                mkdir(obj.map.data)
+                addpath(genpath(obj.map.data)) 
+            catch
+            end
+        end
+        if exist(obj.map.data,'dir') ~= 7
             OK = 0;
         end
         if OK == 0
@@ -164,7 +171,7 @@ methods
         % Create main figure -----
         %[left, bottom,width, height]
         obj.guiSize.width = 545; % figure width in pixels
-        obj.guiSize.height = 675; %750;
+        obj.guiSize.height = 620; %625; %675; %750;
         scrsz = get(0,'ScreenSize'); % get the current screen size
         obj.guiSize.left = round(scrsz(4) * .1); % location of left edge
         obj.guiSize.bottom = scrsz(4) * .1; % location of bottom
@@ -185,7 +192,7 @@ methods
         obj.CONTROL = uipanel('Parent',obj.H,'Title','CONTROL PANEL','FontSize',12,...
             'BackgroundColor','white','Units','Pixels','Position',[10 10 105*5+4 140]);
         obj.VIEW = uipanel('Parent',obj.H,'Title','VIEW','FontSize',12,...
-            'BackgroundColor','white','Units','Pixels','Position',[10 160 105*5+4 520]);        
+            'BackgroundColor','white','Units','Pixels','Position',[10 160 105*5+4 455]);     
         % Populate control panel -----
         obj.gui.height = 105;
         obj.gui.width = 105;
@@ -390,7 +397,7 @@ methods
             return
         end
         try
-            obj.objPlayrec.makeInvisible % if there are any open playrecARLas figures, make them disappear
+            obj.objPlayrec.killPlots % if there are any open playrecARLas figures, make them disappear
         catch
         try
             delete(obj.objPlayrec) % delete any currently open playrecARLas objects
@@ -402,6 +409,10 @@ methods
         try 
             obj.objInitARLas.killPlots
             delete(obj.objInitARLas);
+        catch
+        end
+        try
+            obj.objPlayrec.killPlots
         catch
         end
         obj.objInit = initARLas(obj); % instantiate an object of class initARLas
@@ -417,99 +428,9 @@ methods
             end
             try % if previously saved initialization values exist, try to use them
                 dummy = load([pathName,fileName]); % load the saved initialization
-                default = dummy.default;
-                currentDevs = playrec('getDevices'); % get the current system setup
-                % find the current locations of the desired host API
-                N = size(currentDevs,2);
-                match = zeros(N,1);
-                for ii=1:N
-                    q = currentDevs(ii).hostAPI;
-                    match(ii,1) = strcmp(q,strtrim(default.hostAPI_now));
-                end
-                indxAPI = find(match); % indices of desired host API
-                for ii=1:N
-                    q = currentDevs(ii).name;
-                    match(ii,1) = strcmp(q,strtrim(default.name_out_now));
-                end
-                indxOutName = find(match); % indices of desired device name
-                for ii=1:N
-                    q = currentDevs(ii).name;
-                    match(ii,1) = strcmp(q,strtrim(default.name_in_now));
-                end
-                indxInName = find(match); % indices of desired device name
-                % the current values to use are the intersection of host API and device name
-                indx1 = intersect(indxAPI,indxOutName);
-                indx2 = intersect(indxAPI,indxInName);
-                indx = intersect(indx1,indx2);
-                indx = indx(1);
-                obj.objInit.hostAPI_now = default.hostAPI_now; % this stays the same
-                obj.objInit.HostAPI = currentDevs(indx).name; % get the current values
-                obj.objInit.hostAPI = default.hostAPI; % this stays the same
-                obj.objInit.hostAPIindices = indxAPI; % the new indices
-
-                obj.objInit.deviceIndx_out = indxAPI;
-                obj.objInit.indx_out_now = indxOutName;
-                for ii=1:length(indxAPI)
-                    jar(ii,1) = currentDevs(indxAPI(ii)).deviceID;
-                end
-                obj.objInit.deviceID_out = jar;
-                obj.objInit.id_out_now = currentDevs(indxOutName).deviceID;
-                obj.objInit.name_out_now = default.name_out_now;
-                obj.objInit.chans_out = (0:1:currentDevs(indxOutName).outputChans)';
-                if default.chans_out_now > max(obj.objInit.chans_out)
-                    obj.objInit.chans_out_now = max(obj.objInit.chans_out);
-                else
-                    obj.objInit.chans_out_now = default.chans_out_now;
-                end
-                obj.objInit.deviceIndx_in = indxAPI;
-                obj.objInit.indx_in_now = indxInName;
-                for ii=1:length(indxAPI)
-                    jar(ii,1) = currentDevs(indxAPI(ii)).deviceID;
-                end
-                obj.objInit.deviceID_in = jar;                    
-                obj.objInit.id_in_now = currentDevs(indxInName).deviceID;
-                obj.objInit.name_in_now = default.name_in_now;
-                obj.objInit.chans_in = (0:1:currentDevs(indxInName).inputChans)';
-                if default.chans_in_now > max(obj.objInit.chans_in)
-                    obj.objInit.chans_in_now = max(obj.objInit.chans_in);
-                else
-                    obj.objInit.chans_in_now = default.chans_in_now;
-                end                    
-                obj.objInit.os = default.os;
-                obj.objInit.fs = default.fs;
-                obj.objInit.fs_now = default.fs_now;
-                obj.objInit.delay_now = default.delay_now;
-                obj.objInit.card2volts_now = default.card2volts_now;
-                obj.objInit.devs = currentDevs;
-                obj.objInit.specify = default.specify(1:obj.objInit.chans_in_now+1); %default.specify;
-                names = fieldnames(default.micSens);
-                sizeDiff = size(names,1) - (obj.objInit.chans_in_now + 1);
-                if sizeDiff < 0 % build new fields
-                    for ii=size(names,1):obj.objInit.chans_in_now
-                        obj.objInit.label.(matlab.lang.makeValidName(['Ch',num2str(ii)]))= 'Not Assigned';    
-                        obj.objInit.ampGain.(matlab.lang.makeValidName(['Ch',num2str(ii)]))= 0; % set defaults to 0 dB    
-                        obj.objInit.micSens.(matlab.lang.makeValidName(['Ch',num2str(ii)]))= 1; % set defaults to 1 V/Pa
-                    end
-                elseif sizeDiff > 0 % delete old fields
-                    for ii=size(names,1):-1:obj.objInit.chans_in_now+2
-                        obj.objInit.label = rmfield(obj.objInit.label,names{ii});
-                        obj.objInit.ampGain = rmfield(obj.objInit.ampGain,names{ii});
-                        obj.objInit.micSens = rmfield(obj.objInit.micSens,names{ii});
-                    end
-                else % sizes are equal; simply use existing fields 
-                    obj.objInit.label = default.label;
-                    obj.objInit.ampGain = default.ampGain;
-                    obj.objInit.micSens = default.micSens;
-                end
-                obj.objInit.usingSavedValues = 1;
-                obj.objInit.updateGui % update the gui with these new values
-                obj.objInit.chansInManager
-                if size(obj.objInit.SPECIFY.String,1) > 1
-                    set(obj.objInit.SPECIFY,'Value',2)
-                end
-                obj.objInit.inputManager
+                obj.objInit.trySavedValues(dummy);
                 obj.buttonManager(22)
-            catch ME
+            catch ME %-----------------------------------------------------
                 errorTxt = {'  Issue: Unable to initialize: arlas.m using saved values, function init.playrec.'
                      '  Action:  Create new initialization.'
                      '  Location: arlas.initPlayrec.'
@@ -606,7 +527,6 @@ methods
         end
         try
             obj.objInit.killPlots
-            %obj.objInit.makeInvisible
         catch
         end
         obj.buttonManager(50)
@@ -659,8 +579,20 @@ methods
                 errorMsgARLas(errorTxt);
                 obj.buttonManager(51)
                 obj.printError(ME)
-                %set(obj.VIEW,'Title','VIEW: ')
+                obj.objPlayrec.killPlots % get rid of playrecARLas plots
+                obj.killRun = 1;
                 return
+            else
+                errorTxt = {'  Issue: Error in experiment file.'
+                     '  Action: Run stopped early.'
+                     '  Location: in currently loaded experiment file.'
+                     ['            ',obj.expFileName,'.m']
+                    };
+                errorMsgARLas(errorTxt);
+                obj.buttonManager(51)
+                obj.printError(ME)    
+                obj.objPlayrec.killPlots % get rid of playrecARLas plots
+                obj.killRun = 1;                
             end
             return
         end
@@ -679,7 +611,10 @@ methods
             obj.objPlayrec.killRun = 1;
             obj.killRun = 1;
             pause(0.5)
-            playrec('delPage');
+            try
+                playrec('delPage');
+            catch
+            end
         catch ME
              errorTxt = {'  Issue: Unsuccessful abort attempt.'
                  '  Action: Abort not completed.'
@@ -691,7 +626,8 @@ methods
             return
         end
         try
-            obj.objPlayrec.makeInvisible % if there are any open playrecARLas figures, make them disappear
+            obj.objPlayrec.killPlots
+            %obj.objPlayrec.makeInvisible % if there are any open playrecARLas figures, make them disappear
         catch
         end
         obj.buttonManager(62) % aborted successfully
@@ -744,14 +680,7 @@ methods
             'Interruptible','off','Callback',@obj.enterID);
         
     end
-%     function enterIDShortcut(varargin)
-%         keyboard
-%         obj = varargin{1};
-%         key = get(gcf,'CurrentKey');
-%         if(strcmp (key , 'return'))
-%             obj.enterID(hObject, eventdata, handles)
-%         end
-%     end
+
     function enterID(varargin) % get subject, experiment, and operator IDs and save them; create folders
         obj = varargin{1};
         subjID = get(obj.h_subjBox,'String'); % check subject ID is present
@@ -838,19 +767,198 @@ methods
     end
     
     % functions that get and return values for use in experiment files --------
-    function samplingRate = fs(varargin) % return the current sampling rate
+    function [samplingRate] = fs(varargin) % return the current sampling rate
         obj = varargin{1};
         samplingRate = obj.objInit.fs_now;
     end
-    function chans = chansOut(varargin)
-        obj = varargin{1};
-        chans = obj.objInit.chans_out_now;
+    function setRecList(varargin) % define the input channels to be used for recording
+        % Usage: obj.setRecList(ch,label,micSens,gain); 
+        % Specify channel number for each (1 through maxN, where maxN is the maximum for the sound card)
+        %     For each, specify a label, mic sensitivity, and gain.
+        %     Label is a string for idenfification and file saving purposes
+        %     Mic sens is in V/Pa. If no microphone is used, set = 1.
+        %     Gain refers to hardware gain applied prior to ADC by the sound card. Specify in dB.        
+       obj = varargin{1};
+       if size(varargin,2) ~= 5
+            disp('Incorrect number of inputs')
+            return
+        end
+        ch = varargin{2}; % channel designation
+        ok = obj.checkInput_ch(ch);
+        if ~ok
+            return
+        end
+        label = varargin{3};
+        micSens = varargin{4};
+        ampGain = varargin{5};
+        maxGain = 200; % maximum gain allowed. This added as a caution to avoid gain entered in linear units
+        if ampGain > maxGain
+          errorTxt = {'  Issue: Gain exceeds maxGain of 200 dB.'
+                 '  Fix: Ensure gain is entered as a dB value, not as a linear value.'
+                 '  Location: in playrecARLas.setRecList.'
+                };
+            errorMsgARLas(errorTxt);
+            return
+        end
+        try
+            indx = find(obj.objPlayrec.recChanList==ch); % check to see if chan already exists
+            if isempty(indx)
+               indx = length(obj.objPlayrec.recChanList) + 1;
+            end
+            obj.objPlayrec.recChanList(1,indx) = ch;
+            obj.objPlayrec.micSens(1,indx) = micSens;
+            obj.objPlayrec.ampGain(1,indx) = ampGain;
+            obj.objPlayrec.label{1,indx} = label;
+        catch
+           errorTxt = {['  Issue: Error specifying stimulus: ',txt]
+                 '  Action: None.'
+                 '  Location: in playrecARLas.setRecList.'
+                };
+            errorMsgARLas(errorTxt);                         
+        end        
     end
-    function chans = chansIn(varargin)
+    function setPlayList(varargin) % define the output channels to be used for recording
+        % Usage: obj.setPlayList(stimulus,ch);
+        %  Load one vector at a time. Each vector is a channel of output.
+        %      Use vector of zeros if desire an output channel with no output.
+        %      Specify channel number for each (1 through maxN, where maxN is the maximum for the sound card)
         obj = varargin{1};
-        chans = obj.objInit.chans_in_now;
+        if size(varargin,2) ~= 3
+            disp('Incorrect number of inputs')
+            return
+        end
+        ch = varargin{3}; % channel designation
+        ok = obj.checkInput_ch(ch);
+        if ~ok
+            obj.objPlayrec.killRun = 1;
+            obj.objPlayrec.killPlots
+            return
+        end
+        stim = varargin{2}; % stimulus
+        R = size(stim,1);
+        if R < 2
+            errorTxt = {'  Issue: Error specifying stimulus: number of rows must be > 1'
+                 '  Action: None.'
+                 '  Location: in playrecARLas.setPlayList.'
+                };
+            errorMsgARLas(errorTxt);
+            return
+        end
+        try % if input is correct format, load for playback
+            indx = find(obj.objPlayrec.playChanList==ch); % check to see if chan already exists
+            if isempty(indx)
+               indx = length(obj.objPlayrec.playChanList) + 1;
+            end
+            obj.objPlayrec.playChanList(1,indx) = ch;
+            obj.objPlayrec.loadingDock.(matlab.lang.makeValidName(['Ch',num2str(ch)])) = stim;
+        catch ME
+            errorTxt = {['  Issue: Error specifying stimulus: ',txt]
+                 '  Action: None.'
+                 '  Location: in playrecARLas.setPlayList.'
+                };
+            errorMsgARLas(errorTxt);                        
+        end
     end
-    function nReps(varargin)
+    function clearRecList(varargin) % clear previously used input channels
+        % Usage: obj.clearRecList(ch) --> this will delete a specific channel
+        %        obj.clearRecList([3 2 5]) --> this will delete all channels specified in the vector
+        %        obj(clearRecList    --> this will delete all channels (except ch0 default)
+       obj = varargin{1};
+       if size(varargin,2) == 1
+           obj.objPlayrec.recChanList = 0;
+           obj.objPlayrec.micSens = 1;
+           obj.objPlayrec.ampGain = 0;
+           n = length(obj.objPlayrec.label);
+           for ii=n:-1:2
+              obj.objPlayrec.label{1,ii} = []; 
+           end
+           counter = 1;
+           for ii=1:length(obj.objPlayrec.label)
+               if ~isempty(obj.objPlayrec.label{1,ii})
+                   temp{1,counter} = obj.objPlayrec.label{1,ii};
+                   counter = counter + 1;
+               end
+           end
+           obj.objPlayrec.label = temp;
+       elseif size(varargin,2) == 2
+            try
+                ch = varargin{2};
+                for jj=1:length(ch)
+                    ok = obj.checkInput_ch(ch(jj));
+                    if ~ok
+                        obj.objPlayrec.killRun = 1;
+                        obj.objPlayrec.killPlots
+                        return
+                    end                                    
+                    indx = find(obj.objPlayrec.recChanList==ch(jj)); % check to see if chan already exists
+                    if ~isempty(indx)
+                        obj.objPlayrec.recChanList(indx) = [];
+                        obj.objPlayrec.micSens(indx) = [];
+                        obj.objPlayrec.ampGain(indx) = [];
+                        obj.objPlayrec.label{1,indx} = [];
+                        counter = 1;
+                        for ii=1:length(obj.objPlayrec.label)
+                            if ~isempty(obj.objPlayrec.label{1,ii})
+                                temp{1,counter} = obj.objPlayrec.label{1,jj};
+                                counter = counter + 1;
+                            end
+                        end
+                        obj.objPlayrec.label = temp;     
+                    end
+                end
+            catch
+               errorTxt = {'  Issue: Error deleting recording channel.'
+                     '  Action: None.'
+                     '  Location: in playrecARLas.clearRecList.'
+                    };
+                errorMsgARLas(errorTxt);                         
+            end                   
+       else
+            disp('Incorrect number of inputs')
+            return
+       end
+    end
+    function clearPlayList(varargin) % clear previously used input channels
+        % Usage: obj.clearPlayList(ch) --> this will delete a specific channel
+        %        obj.clearPlayList([3 2 5]) --> this will delete all channels specified in the vector
+        %        obj(clearPlayList    --> this will delete all channels (except ch0 default)
+       obj = varargin{1};
+       if size(varargin,2) == 1
+           obj.objPlayrec.playChanList = 0;
+           names = fieldnames(obj.objPlayrec.loadingDock);
+           for ii=2:size(names,1)
+               obj.objPlayrec.loadingDock = rmfield(obj.objPlayrec.loadingDock,names{ii});
+           end
+       elseif size(varargin,2) == 2
+            try
+                ch = varargin{2};
+                for jj=1:length(ch)
+                    ok = obj.checkInput_ch(ch(jj));
+                    if ~ok
+                        obj.objPlayrec.killRun = 1;
+                        obj.objPlayrec.killPlots
+                        return
+                    end                                    
+                    indx = find(obj.objPlayrec.playChanList==ch(jj)); % check to see if chan already exists
+                    if ~isempty(indx)
+                        obj.objPlayrec.playChanList(indx) = [];
+                        name = ['Ch',num2str(ch(jj))];
+                        obj.objPlayrec.loadingDock = rmfield(obj.objPlayrec.loadingDock,name);
+                    end
+                end
+            catch
+               errorTxt = {'  Issue: Error deleting recording channel.'
+                     '  Action: None.'
+                     '  Location: in playrecARLas.clearRecList.'
+                    };
+                errorMsgARLas(errorTxt);                         
+            end                   
+       else
+            disp('Incorrect number of inputs')
+            return
+       end
+    end
+    function nReps(varargin) % set the number of playback/record repetitions
         obj = varargin{1};
         N = varargin{2};
         if N < 1
@@ -859,25 +967,73 @@ methods
         N = round(N); % force N to be an integer
         obj.objPlayrec = N;
     end
-    function [header,data] = retrieveData(varargin)
+    function [header,data] = retrieveData(varargin) % return the header and recording matrix
         obj = varargin{1};
-        channel = varargin{2}; % 1,2,3, etc.
-        if channel > size(obj.objPlayrec.savedFiles,2)
-            if obj.objPlayrec.killRun == 1
-                return
-            else
-                errorTxt = {'  Issue: Requested channel number exceeds the number of saved channels.'
-                     '  Action: No data returned.'
-                     '  Location: arlas.retrieveData.'
-                    };
-                errorMsgARLas(errorTxt);
-            end
+        partial = varargin{2};
+        if ~isa(partial,'char')
+            errorTxt = {'  Issue: Error specifying file to retrieve: input is not a string.'
+                 '  Fix: Specify a valid partial or full file name, enclosed in quotes.'
+                 '  Location: in playrecARLas.retrieveData.'
+                };
+            errorMsgARLas(errorTxt);            
+            return
         end
-        fileName = obj.objPlayrec.savedFiles{channel}; % the name of the file saved to input channel 1
+        indx1 = strfind(obj.objPlayrec.savedFiles,partial);
+        indx2 = find(~(cellfun('isempty',indx1)));
+        if isempty(indx2)
+            errorTxt = {'  Issue: Error specifying file to retrieve: no match.'
+                 '  Fix: Specify a valid partial or full file name, enclosed in quotes.'
+                 '  Location: in playrecARLas.retrieveData.'
+                };
+            errorMsgARLas(errorTxt);
+            return            
+        end
+        if length(indx2) > 1
+            errorTxt = {'  Issue: Error specifying file to retrieve: more than one match.'
+                 '  Fix: Be more specific in giving a partial or full file name, enclosed in quotes.'
+                 '  Location: in playrecARLas.retrieveData.'
+                };
+            errorMsgARLas(errorTxt);
+            return                        
+        end
+        fileName = obj.objPlayrec.savedFiles{indx2}; % the name of the file saved to input channel 1
         pathName = obj.objPlayrec.savedFilesPath; % the location of the saved files
         dummy = load([pathName,fileName]); % dummy contains two fields: header and data
         header = dummy.header;
         data = dummy.data;
+    end
+    
+    function [ok] = checkInput_ch(varargin) % check input arguments for the functions defineInput and defineOutput
+        ok = 1;
+        obj = varargin{1};
+        ch = varargin{2};
+        if ~isa(ch,'numeric')
+            ok = 0;
+            txt = 'Channel must be data type numeric.';
+        end
+        if mod(ch,1)~= 0
+            ok = 0;
+            txt = 'Channel must be an integer.';
+        end
+        if ch < 1
+            ok = 0;
+            txt = 'Channel must be >= 1.';
+        end
+        if ch > obj.objInit.chans_out
+            ok = 0;
+            txt = 'Channel must be <= to max number of initialized channels';
+        end
+        if ~ok
+            errorTxt = {['  Issue: Error specifying channel: ',txt]
+                 '  Action: None.'
+                 '  Location: in playrecARLas.checkInput_ch.'
+                };
+            errorMsgARLas(errorTxt);
+        end
+    end
+    function [ok] = checkForErrors(varargin) % check to see if experiment should continue or stop due to errors
+         obj = varargin{1};
+        ok = ~obj.objPlayrec.killRun;
     end
 end
 end

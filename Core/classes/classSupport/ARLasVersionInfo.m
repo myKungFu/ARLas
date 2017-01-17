@@ -48,3 +48,8 @@ function [] = ARLasVersionInfo()
 %               Example of old version: stimTrain = randn(44100,2);
 %               Example of new version: stimTrainEx.Ch1 = randn(44100,1);
 %                                       stimTrainEx.Ch2 = randn(44100,1);
+% 2016.12.13
+%   Added automatic creation of the Data folder on startup, if it doesn't
+%       exist. This will enable versions saved on Github to not include an 
+%       empty data folder.
+

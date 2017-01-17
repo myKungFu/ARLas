@@ -40,23 +40,47 @@ for ii=1:nFreqs % loop across f2 frequencies
     S2 = L2 * sin(2*pi*f2(ii)*time);
 
     % 2) LOAD THE STIMULUS ----------------------------------------------------
-    obj.objPlayrec.stimTrain.Ch1 = S1; % load the stimulus
-    obj.objPlayrec.stimTrain.Ch2 = S2; % load the stimulus
-    obj.objPlayrec.nReps = 5; % number of times to play stimulus
+    %obj.objPlayrec.stimTrain.Ch1 = S1; % load the stimulus
+    %obj.objPlayrec.stimTrain.Ch2 = S2; % load the stimulus
+    %obj.objPlayrec.nReps = 5; % number of times to play stimulus
+% 2) LOAD THE STIMULUS ----------------------------------------------------
+% Load Output:
+obj.setPlayList(S1,1);
+obj.setPlayList(S2,2);
+
+% Load Input:
+label = 'ER10C';
+micSens = 0.05;
+gain = 20;
+ch = 1;
+obj.setRecList(ch,label,micSens,gain);
+
+% Load Input:
+label = 'GRASS';
+micSens = 1;
+gain = 80;
+ch = 2;
+obj.setRecList(ch,label,micSens,gain);
+    
+obj.objPlayrec.nReps = 5; % number of times to play stimulus   
     
     % 3) PLAYBACK & RECORD ----------------------------------------------------
     obj.objPlayrec.run % run the stimulus
     if obj.killRun
        return
     end    
-    % 4) RETRIEVE DATA ----------------------------------------------------
-    channel = 1; % which channel to retrieve data from
-    [header,data] = obj.retrieveData(channel);
-    DPOAE(:,ii) = mean(data,2);
+    
+      % 4) RETRIEVE DATA ----------------------------------------------------
+%     channel = 1; % which channel to retrieve data from
+%     [header,data] = obj.retrieveData(channel);
+[header,data] = obj.retrieveData('Ch1'); % CAP data
+DPOAE(:,ii) = mean(data,2);
 end
 
 % 5) ANALYZE & PLOT DATA ----------------------------------------------------
 % Common Data Dperations: (code is available in ARLas/Core/general/)
+
+keyboard
 for ii=1:nFreqs
     % Frequency Domain Analysis
     ref = 0.00002; % reference is 20 uPa
