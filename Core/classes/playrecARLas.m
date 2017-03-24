@@ -575,7 +575,7 @@ methods
            %objPlayrec.ampGain = 10.^(objPlayrec.ampGain / 20); % convert to linear multiplier
         end
         try
-            if isempty(objPlayrec.holdingPen) && objPlayrec.systemDelay > 0 % the holding pen is therefore empty; fill it
+            if isempty(objPlayrec.holdingPen) && objPlayrec.systemDelay > 0 % the holding pen is therefore empty; fill it.
                 Recording(1:objPlayrec.systemDelay,:) = []; % discard the first part of the recording due to the delay
                 if objPlayrec.completedPageFiles == 1
                     indx = 0;
@@ -695,6 +695,7 @@ methods
     function doPlot(varargin) % update the waveform plots
         objPlayrec = varargin{1};
         try
+            orig = gcf; % get the current figure; return that figure to top after plotting
             %indx = objPlayrec.chans_in_now(objPlayrec.CHAN_in.Value);
             indx = objPlayrec.CHAN_in.Value;
             color = objPlayrec.colorScheme(indx,:); % select the plotting color for the waveform
@@ -749,6 +750,7 @@ methods
             end
             set(objPlayrec.AVG,'String',[num2str(objPlayrec.completedBuffers),' of ',num2str(objPlayrec.nReps)])
             pause(0.001)
+            figure(orig)
         catch ME
             errorTxt = {'  Issue: Error plotting data.'
                  '  Action: None.'
