@@ -9,49 +9,52 @@ function [] = ARLas_cavityRecordings(varargin)
 % The University of Iowa
 % Author: Shawn Goodman
 % Date: June 29, 2015;
-% Last Updated: January 16, 2017
+% Last Updated: January 31, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 obj = varargin{1};
 
 % IMPORTANT! UPDATE THE FOLLOWING LINES OF CODE BEFORE RUNNING!! -----------------------------------------
 cavityLengths = [1.85, 2.56, 4, 5.4, 8.3]; % intended cavity lengths (cm);
 cavityDiameter = 0.8; % cavity diameter (cm)
-cavityTemperature = 24.5; % (C); 25 = room temp; 37 = body temp
-fmin = 200; % in Hz
-fmax = 8000; % in Hz
-%extra = 0.5; % 0.5 accounts for the standard rubber ER10B+tip, assuming you insert it into the tube up to the cap.
-extra = 1.68; %1.86; %2.047; % 1.86 accounts for the standard foam ER10C tip, assuming you insert it into the tube as far as possible
+cavityTemperature = 22.2; % (C); F 72 degrees; 37 = body temp
+fmin = 200; % in Hz, minimum frequency tested
+fmax = 8000; % in Hz, maximum frequency tested
+extra = 1.68; % account for the extra length on tip: 1.68 = foam ER10C tip, assuming you insert it into the tube as far as possible
+              % 0.5 for the standard rubber ER10B+tip, assuming you insert it into the tube up to the cap.
 
-% ----- Specify Input:
-input.label = 'ER10C'; % label that will be used for naming saved files 
-input.micSens = 0.05; % microphone sensitivity in V/Pa
-input.gain = 20; % amplifier gain in dB 
-input.ch = 1; % channel on the sound card through which the recording is coming
+% ----- Specify Inputs and Outputs:
+    input.label = 'ER10C_1'; 
+    input.micSens = 0.05; % sensitivity in V/Pa
+    input.gain = 20; % amplifier gain in dB
+    input.ch = 1; % channel on the sound card
 
-% ----- Specify Output:
-output.label = {'ER10C_Ch1','ER10C_Ch2'}; % label to identify the transducer being calibrated
-output.gain = [20,20]; % gain in dB; this value not used, but just documents the physical configuration of the probe, 
-output.ch = [1,2]; % channel on the sound card through which the playback is sent
-output.receiver = [1,2]; % which receiver on the ER10C is being used
+%     output.label = {'ER10C_Ch1','ER10C_Ch2'}; % label to identify the transducer being calibrated
+%     output.gain = [20,20]; % gain in dB; this value not used, but just documents the physical configuration of the probe, 
+%     output.ch = [1,2]; % channel on the sound card through which the playback is sent
+%     output.receiver = [1,2]; % which receiver on the ER10C is being used
+    output.label = {'ER10C_Ch1'}; % label to identify the transducer being calibrated
+    output.gain = [20]; % gain in dB; this value not used, but just documents the physical configuration of the probe, 
+    output.ch = [1]; % channel on the sound card through which the playback is sent
+    output.receiver = [1]; % which receiver on the ER10C is being used
+
 % -------------------------------------------------------------------------------------------------------
 
 stimulus = getStimulus(obj.fs,fmin,fmax); % get stimulus
+stimulus = stimulus / 10; % account for power amp gain
+
 nCavities = length(cavityLengths); % loop over number of cavity lengths specified
 nChannelsOut = length(output.ch); % number of output channnels being calibrated
-for ii=1:nChannelsOut
-    thevRecordings.(matlab.lang.makeValidName(output.label{ii})) = zeros(size(stimulus,1),nCavities);
-end
-for jj=1:nCavities % loop over cavities
-    showInstructions(cavityLengths,extra,jj,nCavities); % show the user the lengths to use
+for jj=1:nCavities % loop over number of cavities
+    showInstructions(cavityLengths,extra,jj);
+    
     for kk=1:nChannelsOut % loop over output channels; test output channels one at a time
-        % LOAD THE CHANNELS ----------------------------------------------------
-        obj.clearRecList % clear any previously used recording list
-        obj.setRecList(input.ch,input.label,input.micSens,input.gain) % load the recording info for ARLas to use
-        obj.clearPlayList % clear any previously used playback list
-        obj.setPlayList(stimulus,output.ch(kk)) % load the currently tested output channel
+        % LOAD THE STIMULUS ----------------------------------------------------
+        obj.setRecList(input.ch,input.label,input.micSens,input.gain); % load the recording info for ARLas to use
+        obj.clearPlayList % clear the previously used playback list
+        obj.setPlayList(stimulus,output.ch(kk)); % load the currently tested output channel
+        obj.objPlayrec.nReps = 128; % number of times to play stimulus
 
         % PLAYBACK & RECORD ----------------------------------------------------
-        obj.objPlayrec.nReps = 32; %128; % number of times to play stimulus
         obj.objPlayrec.run % run the stimulus
         ok = obj.checkForErrors;
         if ~ok
@@ -59,9 +62,14 @@ for jj=1:nCavities % loop over cavities
         end   
         
         % RETRIEVE DATA ----------------------------------------------------
-        [header,data] = obj.retrieveData(input.label); % get raw data
-        d = cleanData(data,obj.fs);
-        thevRecordings.(matlab.lang.makeValidName(output.label{kk}))(:,jj) = d;
+        [header,data] = obj.retrieveData('Ch1'); % get raw data
+            
+        channel = kk; % which channel to retrieve data from
+        if kk == 1
+            thevRecording1(:,jj) = cleanData(data,obj.fs);
+        elseif kk == 2
+            thevRecording2(:,jj) = cleanData(data,obj.fs);
+        end
     end
 end
 
@@ -73,33 +81,38 @@ recordingParams.cavityLengths_nominal = cavityLengths;
 recordingParams.fmin = fmin;
 recordingParams.fmax = fmax;
 recordingParams.timeStamp = datestr(clock); % time stamp for when this calibration was done
-recordingParams.delay_now = obj.objPlayrec.systemDelay;
-recordingParams.card2volts_now = obj.objPlayrec.card2volts; % got to here!!!
-recordingParams.output = output;
+recordingParams.delay_now = obj.objInit.delay_now;
+recordingParams.card2volts_now = obj.objInit.card2volts_now;
+recordingParams.hostAPI_now = obj.objInit.hostAPI_now;
 recordingParams.input = input;
-recordingParams.thevCalPathName = obj.map.calibrations;
-sep = filesep;
-recordingParams.cavityRecordingsPathName = [obj.map.calibrations,'cavityRecordings',sep];
+recordingParams.output = output;
+%recordingParams.thevCalPathName = obj.map.calibrations;
+recordingParams.thevCalPathName = obj.objPlayrec.savedFilesPath;
+%recordingParams.cavityRecordingsPathName = obj.map.calibrations;
+recordingParams.cavityRecordingsPathName = obj.objPlayrec.savedFilesPath;
 
-for kk=1:nChannelsOut
-    savedFiles.(matlab.lang.makeValidName(output.label{kk})) = saveData(recordingParams,stimulus,thevRecordings.(matlab.lang.makeValidName(output.label{kk})),output.ch(kk));
+channel = 1;
+savedFile1 = saveData(recordingParams,stimulus,thevRecording1,channel,recordingParams.cavityRecordingsPathName);
+if nChannelsOut == 2
+    channel = 2;
+    savedFile2 = saveData(recordingParams,stimulus,thevRecording2,channel,recordingParams.cavityRecordingsPathName);
 end
 
-try % Try calculating thevenin source. Note that this can also be done manually, later on.
-   for kk=1:nChannelsOut 
-        dummy = load(savedFiles.(matlab.lang.makeValidName(output.label{kk})));
-        t = thevCal(dummy.recordingParams,dummy.stimulus,dummy.recordings);
-        t.calculate
-        t.saveThev
-   end
-catch ME
-    
+load(savedFile1)
+t = thevCal(recordingParams,stimulus,recordings);
+t.calculate
+t.saveThev
+if nChannelsOut == 2
+    load(savedFile2)
+    t = thevCal(recordingParams,stimulus,recordings);
+    t.calculate
+    t.saveThev
 end
 end
 
 
 % internal functions ------------------------------------------------------
-function [] = showInstructions(cavityLengths,extra,jj,nCavities)
+function [] = showInstructions(cavityLengths,extra,jj)
     gui.height = 143;
     gui.width = 296;
     scrsz = get(0,'ScreenSize'); % get the current screen size
@@ -112,6 +125,7 @@ function [] = showInstructions(cavityLengths,extra,jj,nCavities)
         h1 = uicontrol('Parent',h,'Style','togglebutton','BackgroundColor',[1 1 1],...
             'Position',[1 1 296 194],'Visible','on');
         set(h1,'CData',imread('thevSetup.jpg'))
+    nCavities = length(cavityLengths);
     if jj < nCavities
         txt = ({['1. Place probe into tube of length = ',num2str(cavityLengths(jj)+extra),' cm.'];'';...
             ['2. (Next length will be ',num2str(cavityLengths(jj+1)+extra),' cm.)'];'';...
@@ -149,8 +163,10 @@ function [X] = cleanData(X,fs)
     X(1:rampN,:) = X(1:rampN,:) .* h;
 end
 
-function [savedFile] = saveData(recordingParams,stimulus,recordings,channel)
-    pathName = recordingParams.cavityRecordingsPathName;
+function [savedFile] = saveData(recordingParams,stimulus,recordings,channel,pathName)
+    if nargin < 5
+        pathName = recordingParams.cavityRecordingsPathName;
+    end
     if ~exist(pathName,'dir')
         mkdir(pathName)
         addpath(genpath(pathName))
