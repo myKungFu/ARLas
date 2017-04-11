@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: November 29, 2016
+% Last Updated: April 11, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -52,4 +52,10 @@ function [] = ARLasVersionInfo()
 %   Added automatic creation of the Data folder on startup, if it doesn't
 %       exist. This will enable versions saved on Github to not include an 
 %       empty data folder.
+%
+% 2017.04.11
+%   Changed a line in playrecARLas.queue. Now only nReps + 1 copies of the
+%       are added to the queue. (Used to be 2*nReps). Since we no longer do
+%       online artifact rejection, the extra overhead is not necessary and
+%       can cause unexpected performance in certain conditions.
 
