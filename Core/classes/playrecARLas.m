@@ -8,7 +8,7 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: January 10, 2017
+% Last Updated: April 11, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
@@ -437,7 +437,8 @@ methods
     function queue(varargin) % load the queue and start it running
         objPlayrec = varargin{1};
         objPlayrec.writePauseLen = (objPlayrec.nSamples / objPlayrec.fs) * 0.5; % estimate delay between each check for completed buffers
-        NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Load twice what was asked for, and then abort when done.
+        NN = objPlayrec.nReps + 1; % number of buffers to load into queue. Load twice what was asked for, and then abort when done.
+        %NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Load twice what was asked for, and then abort when done.
         if playrec('isInitialised')
             playrec('reset')
         end
