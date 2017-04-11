@@ -8,11 +8,11 @@ classdef arlas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
-% Last Updated: January 10, 2017
+% Last Updated: April 11, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.01.10';
+    arlasVersion = '2017.04.11';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
