@@ -58,4 +58,8 @@ function [] = ARLasVersionInfo()
 %       are added to the queue. (Used to be 2*nReps). Since we no longer do
 %       online artifact rejection, the extra overhead is not necessary and
 %       can cause unexpected performance in certain conditions.
-
+%
+% 2017.04.19
+%   Fixed a bug in arlas.m line 814.
+%       txt did not exist; added additional line: txt = 'problem with specified channels';
+%
