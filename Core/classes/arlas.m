@@ -12,7 +12,7 @@ classdef arlas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.04.11';
+    arlasVersion = '2017.04.19';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -810,6 +810,7 @@ methods
             obj.objPlayrec.ampGain(1,indx) = ampGain;
             obj.objPlayrec.label{1,indx} = label;
         catch
+           txt = 'problem with specified channels';
            errorTxt = {['  Issue: Error specifying stimulus: ',txt]
                  '  Action: None.'
                  '  Location: in playrecARLas.setRecList.'
