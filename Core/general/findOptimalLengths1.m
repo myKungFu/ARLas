@@ -10,7 +10,8 @@ function [epsilon] = findOptimalLengths1(cavityLengths)
 % Date: July 21, 2015
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-q = load(['C:\myWork\ARLas\temp.mat']);
+sep = filesep;
+q = load(['C:',sep,'myWork',sep,'ARLas',sep,'temp.mat']);
 obj = q.obj;
 
 ZLi = calculate_ZLi(cavityLengths,obj);
