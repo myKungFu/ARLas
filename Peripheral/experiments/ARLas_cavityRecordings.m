@@ -9,35 +9,35 @@ function [] = ARLas_cavityRecordings(varargin)
 % The University of Iowa
 % Author: Shawn Goodman
 % Date: June 29, 2015;
-% Last Updated: January 31, 2017
+% Updated: January 31, 2017
+% Last Updated: May 8, 2017 % expanded bandpass filter highcut frequency
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 obj = varargin{1};
 
 % IMPORTANT! UPDATE THE FOLLOWING LINES OF CODE BEFORE RUNNING!! -----------------------------------------
-cavityLengths = [1.85, 2.56, 4, 5.4, 8.3]; % intended cavity lengths (cm);
-cavityDiameter = 0.8; % cavity diameter (cm)
-cavityTemperature = 22.2; % (C); F 72 degrees; 37 = body temp
-fmin = 200; % in Hz, minimum frequency tested
-fmax = 8000; % in Hz, maximum frequency tested
-extra = 1.68; % account for the extra length on tip: 1.68 = foam ER10C tip, assuming you insert it into the tube as far as possible
-              % 0.5 for the standard rubber ER10B+tip, assuming you insert it into the tube up to the cap.
+%cavityLengths = [1.85, 2.56, 4, 5.4, 8.3]; % intended cavity lengths (cm) ssg
+%cavityLengths = [3.15; 3.79; 4.348; 5.532; 7.02]; % intended cavity lengths (cm);
+cavityLengths = flipud([70.21; 55.32; 43.48; 37.90; 31.50])/10;
+%cavityLengths = cavityLengths(:)';
 
-% ----- Specify Inputs and Outputs:
-    input.label = 'ER10C_1'; 
+cavityDiameter = 0.8; % cavity diameter (cm)
+cavityTemperature = 24; %22.2; % (C); F 72 degrees; 37 = body temp
+fmin = 200; % in Hz, minimum frequency tested
+fmax = 20000; % in Hz, maximum frequency tested
+% account for the extra length on tip: 
+extra = .425; % = green rubber ER10x tip, assuming insert only into the tube up to outer flange (cap)
+        % 1.68; = foam ER10C tip, assuming you insert it into the tube as far as possible
+        % 0.5;  = standard rubber ER10B+tip, assuming you insert it into the tube up to the cap.
+
+% Specify Inputs and Outputs:
+    input.label = 'ER10xA'; % change this to be whatever label you want
     input.micSens = 0.05; % sensitivity in V/Pa
     input.gain = 20; % amplifier gain in dB
-    input.ch = 1; % channel on the sound card
+    input.ch = 1; % input channel on the sound card
 
-%     output.label = {'ER10C_Ch1','ER10C_Ch2'}; % label to identify the transducer being calibrated
-%     output.gain = [20,20]; % gain in dB; this value not used, but just documents the physical configuration of the probe, 
-%     output.ch = [1,2]; % channel on the sound card through which the playback is sent
-%     output.receiver = [1,2]; % which receiver on the ER10C is being used
-    output.label = {'ER10C_Ch1'}; % label to identify the transducer being calibrated
-    output.gain = [20]; % gain in dB; this value not used, but just documents the physical configuration of the probe, 
-    output.ch = [1]; % channel on the sound card through which the playback is sent
-    output.receiver = [1]; % which receiver on the ER10C is being used
-
-% -------------------------------------------------------------------------------------------------------
+    output.label = 'ER10xA';
+    output.ch = [1,2]; % output channels on the sound cardthe ER10C is being used
+%------------------------------------------------------------------------------------------
 
 stimulus = getStimulus(obj.fs,fmin,fmax); % get stimulus
 stimulus = stimulus / 10; % account for power amp gain
@@ -86,9 +86,7 @@ recordingParams.card2volts_now = obj.objInit.card2volts_now;
 recordingParams.hostAPI_now = obj.objInit.hostAPI_now;
 recordingParams.input = input;
 recordingParams.output = output;
-%recordingParams.thevCalPathName = obj.map.calibrations;
 recordingParams.thevCalPathName = obj.objPlayrec.savedFilesPath;
-%recordingParams.cavityRecordingsPathName = obj.map.calibrations;
 recordingParams.cavityRecordingsPathName = obj.objPlayrec.savedFilesPath;
 
 channel = 1;
@@ -284,8 +282,16 @@ function b = bpf(Fs)
     % Fs = Sampling Frequency
     Fstop1 = 50;             % First Stopband Frequency
     Fpass1 = 200;             % First Passband Frequency
-    Fpass2 = 18000;           % Second Passband Frequency
-    Fstop2 = 19000;           % Second Stopband Frequency
+    if Fs == 44100
+        Fpass2 = 20000;           % Second Passband Frequency
+        Fstop2 = 22049;           % Second Stopband Frequency
+    elseif Fs == 48000
+        Fpass2 = 21000;           % Second Passband Frequency
+        Fstop2 = 23049;           % Second Stopband Frequency
+    else
+        Fpass2 = 32000;           % Second Passband Frequency
+        Fstop2 = 34000;           % Second Stopband Frequency
+    end
     Dstop1 = 0.0001;          % First Stopband Attenuation
     Dpass  = 0.057501127785;  % Passband Ripple
     Dstop2 = 0.0001;          % Second Stopband Attenuation
