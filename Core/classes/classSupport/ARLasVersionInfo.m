@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: April 11, 2017
+% Last Updated: July 14, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -63,3 +63,25 @@ function [] = ARLasVersionInfo()
 %   Fixed a bug in arlas.m line 814.
 %       txt did not exist; added additional line: txt = 'problem with specified channels';
 %
+% 2017.06.14
+%   Fixed a bug in playrecARLas.m line 770.
+%       ARlas was failing when users tried to switch output screen views at
+%       the very end of a run. This fix simply returns and does not provide
+%       the update.
+%
+% 2017.07.14
+%   Major overhaul and partial re-write of playrecARLas.m.
+%       Changes include removal of holding pen, addition of zero-phase IIR
+%       filtering on the fly, ability to record very short stimulus trains
+%       (shorter than the system delay). This fixes a timing glitch,
+%       wherein short sequences sometimes showed an apparent sudden shift
+%       in delay. Collected data data are now saved when abort button is pressed. 
+%       Fixed numbering tag system so that if a value in the sequence is
+%       missing, it will not be filled in; rather, the program now looks
+%       for the largest value in the sequence and increments by 1.
+%       arlas.m now looks to make sure that the other two classes are of
+%       matching version numbers, otherwise alerts user to discrepancy.
+
+
+
+
