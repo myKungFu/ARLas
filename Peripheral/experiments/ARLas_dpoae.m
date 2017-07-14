@@ -9,30 +9,67 @@ function [] = ARLas_dpoae(varargin)
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: May 4, 2017
+% Updated: July 14, 2017 ssg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ------------------- USER ADJUSTABLE PARAMETERS --------------------------
-fmin = 500; % minimum f2 frequency to test (Hz)
-fmax = 20000; % maximum f2 frequency to test (Hz)
-stepSize = 1/3; % f2 frequency step size (octaves)
+fmin = 2000; % minimum f2 frequency to test (Hz)
+fmax = 18000; % maximum f2 frequency to test (Hz)
+stepSize = 1/2; % f2 frequency step size (octaves)
 fRatio = 1.22; % f2/f1 ratio
-L1 = 75; % level of f1 (dB SPL)
-L2 = 65; % level of f2 (dB SPL)
-nReps = 20; % number of times to play the 1-second stimulus
+L1 = 70; % level of f1 (dB SPL)
+L2 = 70; % level of f2 (dB SPL)
+nReps = 12; % number of times to play the 1-second stimulus
+testing = 'A'; % which probe we are testing ('A','B','C', etc. -- see below)
 
-    % Specify Inputs and Outputs:
-    %   It is assumed that a 1-channel configuration is being used--
-    %   1 channel in and 2 channels out.
-    input.label = 'ER10xA'; % change this to be whatever label you want
-    input.micSens = 0.05; % sensitivity in V/Pa
-    input.gain = 20; % amplifier gain in dB
-    input.ch = 1; % input channel on the sound card
+% Specify Inputs and Outputs:
+% Specify Inputs and Outputs:
+% INPUTS -----
+    % ER10x probe A
+    inputA.label = '0141'; % change this to be whatever label you want
+    inputA.micSens = 0.05; % sensitivity in V/Pa
+    inputA.gain = 20; % amplifier gain in dB
+    inputA.ch = 7; % 1 % input channel on the sound card
 
-    output.label = 'ER10xA';
-    output.ch = [1,2]; % output channels on the sound card
+    % ER10x probe B
+    inputB.label = '0142'; % change this to be whatever label you want
+    inputB.micSens = 0.05; % sensitivity in V/Pa
+    inputB.gain = 20; % amplifier gain in dB
+    inputB.ch = 8; % 2 % input channel on the sound card
     
-calFile = 'LongTubeCal_q_2.mat'; % set to a specific file, using ARLas_longTubeCal.m works well.
+% OUTPUTS -----    
+    % ER10x probe A
+    outputA.label = 'ER10xA';
+    outputA.ch = [7,8]; %[1,2]; % output channels on the sound cardthe ER10C is being used
+
+    % ER10x probe B
+    outputB.label = 'ER10xB';
+    outputB.ch = [5,6]; %[3,4]; % output channels on the sound cardthe ER10C is being used
+
+% if strcmp(testing,'A')
+%     driverProbe = outputA;      % probe being used for playing OUTPUT
+%     measurementProbe = inputA;  % probe whose mic is being calibrated INPUT
+%     fileName_inputCal = []; % microphone correction file; if empty set, will skip correction
+%     fileName_outputCal = 'speakerCal_0141_16.mat'; % loudspeaker output calibration file
+%     clickAmp = 0.75; 
+%     pipAmp = 0.5; 
+% elseif strcmp(testing,'B')
+%     driverProbe = outputB;      % probe being used for playing OUTPUT
+%     measurementProbe = inputB;  % probe whose mic is being calibrated INPUT
+%     fileName_inputCal = [];
+%     fileName_outputCal = 'speakerCal_0141_16.mat'; % loudspeaker output calibration file
+%     clickAmp = 0.75; 
+%     pipAmp = 0.5; 
+% else
+%     error('Unrecognized probe!')
+% end
 %--------------------------------------------------------------------------
+
+% Calibration files are typically locate here and shouldn't change
+pathName_inputCal = 'C:\myWork\ARLas\Peripheral\calibrations\micCals\'; % location of mic calibration files
+pathName_outputCal = 'C:\myWork\ARLas\Peripheral\calibrations\speakerCals\'; % where to save the long-tube cal files
+fileName_outputCal = 'speakerCal_0141_16.mat'; % loudspeaker output calibration file
+fileName_inputCal = []; % microphone correction file; if empty set, will skip correction
 
 disp(' ')
 disp(' ')
@@ -56,21 +93,21 @@ fdp_diff = f2-f1; % frequencies of difference tones
 % CREATE THE STIMULI ------------------------------------------------------
 S1 = zeros(nSamples,nFreqs); % initialize stimulus matrix
 S2 = zeros(nSamples,nFreqs);
+dummy = load([pathName_outputCal,fileName_outputCal]);
+fo = dummy.d.FO; % full card output (dB SPL)
+freq = dummy.d.freq; % frequency (Hz)
 for ii=1:nFreqs
-    dummy = load(calFile);
-    fo = dummy.d.FO; % full card output (dB SPL)
-    freq = dummy.d.freq; % frequency (Hz)
     
-    [~,indx] = min(abs(freq-f1(ii))); % indx of f1
-    a1 = 10^((L1 - fo(indx,1)) /20); % multiplier for first primary
-    [~,indx] = min(abs(freq-f2(ii))); % indx for f2
-    a2 = 10^((L2 - fo(indx,2)) /20); % multiplier for second primary
-    if a1 > 1
-        disp('ERROR: desired output esceeds max output for f1!')
-        return
-    end
-    if a2 > 1
-        disp('ERROR: desired output esceeds max output for f2!')
+    a = interp1(freq,fo(:,1),f1(ii),'pchip');
+    a1 = 10^((L1 - a) /20); % multiplier for first primary
+    
+    a = interp1(freq,fo(:,2),f2(ii),'pchip');
+    a2 = 10^((L2 - a) /20); % multiplier for second primary
+    
+    if (a1 > 1) || (a2 > 1)
+        disp('ERROR: desired output esceeds max output for primaries!')
+        disp(['f1 = ',num2str(f1(ii)),'  f2 = ',num2str(f2(ii))])
+        disp(' ')
         return
     end
     S1(:,ii) = a1 * sin(2*pi*f1(ii)*time);
@@ -80,9 +117,9 @@ DPOAE = zeros(nSamples,nFreqs); % initialize a container for the saved data
 
 % COLLECT THE DATA --------------------------------------------------------
 obj.clearRecList % clear out whatever was used previously 
-obj.setRecList(input.ch,input.label,input.micSens,input.gain);
+obj.setRecList(inputA.ch,inputA.label,inputA.micSens,inputA.gain);
 obj.clearPlayList % clear out whatever was used previously
-obj.objPlayrec.nReps = nReps; % number of times to play stimulus
+obj.setNReps(nReps); % number of times to play stimulus
 
 h1 = figure(111); 
     subplot(2,1,1) % analysis figure
@@ -94,20 +131,21 @@ h1 = figure(111);
     subplot(2,1,2) % dp-gram figure
     hold off
     plot(1,1,'.w')
-    xlabel('Frequency (Hz)','FontSize',12)
+    xlabel('Frequency (kHz)','FontSize',12)
     ylabel('Magnitude (dB SPL)','FontSize',12)
     title('DP-GRAM','FontSize',12)    
 
 d = [];
 t0 = clock;
+obj.setFilter(1);
 for ii=1:nFreqs % loop across f2 frequencies
     t1 = clock;
     disp(['Testing frequency ',num2str(ii),' of ',num2str(nFreqs),': f2=',num2str(f2(ii)),' Hz'])
     if ii > 1
         disp(['  ',num2str(estRemain),' min remaining (est.)'])
     end
-    obj.setPlayList(S1(:,ii),output.ch(1));
-    obj.setPlayList(S2(:,ii),output.ch(2));
+    obj.setPlayList(S1(:,ii),outputA.ch(1));
+    obj.setPlayList(S2(:,ii),outputA.ch(2));
     
     obj.objPlayrec.userInfo = []; % clear out previous, non-structure array info
     obj.objPlayrec.userInfo.f1 = f1(ii);
@@ -122,9 +160,19 @@ for ii=1:nFreqs % loop across f2 frequencies
     if obj.killRun
        return
     end    
-    [header,Data] = obj.retrieveData(['Ch',num2str(input.ch)]); % retrive recorded data
-    d = analyzeDPOAE_HEARD(header,Data,d,h1);
-    plotDPOAE_HEARD(d,h1,0) % update plot for each frequency tested
+    [header,Data] = obj.retrieveData(['Ch',num2str(inputA.ch)]); % retrive recorded data
+   if ~isempty(fileName_inputCal)
+        try
+            dummy = load([pathName_inputCal,fileName_inputCal]);
+            DataClick = fastFilter(dummy.d.h,DataClick);
+            DataPip = fastFilter(dummy.d.h,DataPip);
+        catch
+            disp('ERROR: Problem applying microphone correction.')
+        end
+    end    
+    
+    d = ARLas_analyzeDPOAE(header,Data,d,h1);
+    ARLas_plotDPOAE(d,h1,0) % update plot for each frequency tested
     t2 = clock;
     g = etime(t2,t1)/60;
     estRemain = g*(nFreqs-ii); % estimated time remaining
@@ -135,7 +183,7 @@ d.L2_target = L2; % the target level
 d.nReps = nReps; % the number of stimulus repetitions
 d.fRatio = fRatio; % primary frequency ratio
 d.stepSize = stepSize; % frequency step size (octaves)
-d.calFile = calFile; % which calibration file was used for this data set
+d.outputCal = fileName_outputCal; % which calibration file was used for this data set
 d.subjName = obj.subjectID; % the subject ID
 d.timeStamp = header.timeStamp; % time at which data were collected
 
@@ -145,7 +193,7 @@ disp(['Data collection finished. Test time was ',num2str(g),' minutes.'])
 
 figure(h1)
 subplot(1,1,1)
-plotDPOAE_HEARD(d,h1,1) % final dp-gram
+ARLas_plotDPOAE(d,h1,1) % final dp-gram
 
 % save data
 disp('Saving data. Please wait...')
@@ -268,9 +316,9 @@ function [] = writeDPgram(pathName,fileName,d)
     xlswrite([pathName,fileName],d.fRatio,sheet,range);       
     range = 'A8';
     xlswrite([pathName,fileName],{'Calibration File'},sheet,range);
-    if ~isempty(d.calFile)
+    if ~isempty(d.outputCal)
          range = 'B8';
-        xlswrite([pathName,fileName],d.calFile,sheet,range);
+        xlswrite([pathName,fileName],d.outputCal,sheet,range);
     end
     
     warning on
