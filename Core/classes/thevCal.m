@@ -8,7 +8,7 @@ classdef thevCal < handle
 %
 % USAGE.  There are two ways to create the object:
 % 1) Include required data when object is created
-%       >> t = thevCal2(recordingParams,stimulus,recordings);
+%       >> t = thevCal(recordingParams,stimulus,recordings);
 %
 % 2) Create the object, then manually load the required data
 %       >> t = thevCcal;
@@ -65,8 +65,9 @@ classdef thevCal < handle
 % Author: Shawn Goodman
 % Based originally on code generously provided by Stephen T. Neely
 % Date: July 4, 2015
-% Updated September 2, 2015 - ssg
-% Updated October 31, 2016 - ssg
+% Updated: September 2, 2015 - ssg
+% Updated: October 31, 2016 - ssg
+% Updated: June 13, 2017 - ssg for use with er10x; see line 182
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 properties (SetAccess = private)
@@ -177,11 +178,21 @@ methods
         op = optimset('Display','off','MaxIter',15000); % optimize to find best tube parameters
         % fminsearch minimizes the output of the function findOptimalLengths.m, using 
         % cavityLengths_est as a starting point for the search
+        
+        % NOTE: the following lines changed 6/13/2017 by ssg: this is for
+        % use with the new 10X system, and for that system the estimated
+        % lengths from the resonance is less accurage and better
+        % performance is obtained using this modified code
         if obj.minimizationType == 1 % minimize pressure error
             obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_est,op);
         elseif obj.minimizationType == 2 % minimize impedance error
             obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_est,op);
         end
+%         if obj.minimizationType == 1 % minimize pressure error
+%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_nominal,op);
+%         elseif obj.minimizationType == 2 % minimize impedance error
+%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_nominal,op);
+%         end
         % ------------- End iterative fitting to find optimimized cavity lengths.        
         % optimize for cavity reflectance
         doPlot = 0;
@@ -262,7 +273,7 @@ methods
     function [] = calculate_ZLi(cavityLengths,obj) % cavity impedance (theoretical)
   %         R = exp(-2 * obj.wn * cavityLengths'); % wave equation exponent.  Volume velocity is 0 at the closed end of the tube.
   %         obj.ZLi = obj.z0 .* (1 + R) ./ (1 - R); % Alternative notation: Zc = -iZo*cot(kL), where k = wavenumber
-        R = exp(-2 * obj.wn * cavityLengths'); % wave equation exponent.  Volume velocity is 0 at the closed end of the tube.
+        R = exp(-2 * obj.wn * cavityLengths(:)'); % wave equation exponent.  Volume velocity is 0 at the closed end of the tube.
         % zc = z0 .* (1 + R) ./ (1 - R); % ideal cavity impedance; Alternative notation: Zc = -iZo*cot(kL), where k = wavenumber
         % this formulation of zc assumes perfectly reflective cavities, which
         % is not the case with real tubes. Reducing R in the numerator reduces

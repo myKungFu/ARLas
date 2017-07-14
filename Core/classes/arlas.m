@@ -8,11 +8,11 @@ classdef arlas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
-% Last Updated: April 11, 2017
+% Last Updated: July 13, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.04.19';
+    arlasVersion = '2017.07.14';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -49,21 +49,20 @@ properties (SetAccess = private)
     enterSubjID
     h_enterSubjID
     subjID_OK
+    ping
 end
 properties (SetAccess = public) 
     objInit % object of class initARLas (initialization)
     objPlayrec % object of class playrecARLas (play and record using playrec utility)
     initialized % whether the system is currently initialized
     killRun % whether the abort button has been pushed
-    
     expFileName
     expPathName
     loaded % whether a calibration file is currently loaded
     subjectID
     experimentID
-    operatorID    
+    operatorID
 end
-
 methods
     function obj = arlas(~) % initialize object of class initARLas
         obj.sep = filesep; % get the path delimiter appropriate to the operating system being used
@@ -109,6 +108,7 @@ methods
              '         \\gui'
              '         \\playrec'
              '     \\Peripheral'
+             '         \\analysis'
              '         \\calibrations'
              '         \\experiments'
              '         \\sysConfigs'
@@ -142,6 +142,36 @@ methods
         obj.initPath = obj.map.sysConfigs;
         obj.initFile = 'newSysConfig.mat';
         obj.initGui % initialize the gui
+
+        v0 = obj.arlasVersion;
+        obj.ping = 1;
+        test1 = initARLas(obj); % instantiate an object of class initARLas
+        v1 = [];
+        try v1 = test1.arlasVersion; catch; end
+        test2 = playrecARLas(test1); % instantiate an object of class initARLas
+        v2 = [];
+        try v2 = test2.arlasVersion; catch; end
+        delete(test1)
+        delete(test2)
+        fail = 0;
+        if isempty(v0) || isempty(v0) || isempty(v2)
+            fail = 1;
+        end
+        if ~strcmp(v0,v1)
+            fail = 1;
+        end
+        if ~strcmp(v0,v2)
+            fail = 1;
+        end
+        if fail == 1
+            warnTxt = {'  Issue: Mismatch detected between arlas versions.'
+                 '  Action:  Update to most current verion: https://github.com/myKungFu/ARLas.'
+                 '           Ensure that arlas.m, initARLAs.m, and playrecARLas.m are all the same version.'
+                 '           Failure to correct this may result in unstable performance!'
+                };
+            warnMsgARLas(warnTxt);
+        end
+        obj.ping = 0;
     end  
     function abort(varargin) % instructions for aborting when gui closed
         try
@@ -164,234 +194,244 @@ methods
     end
     function initGui(varargin) % initialize the recording gui
         obj = varargin{1};
-        try
+        try % delete figure if it already exists
             delete(obj.H)
         catch
         end
-        % Create main figure -----
-        %[left, bottom,width, height]
-        obj.guiSize.width = 545; % figure width in pixels
-        obj.guiSize.height = 620; %625; %675; %750;
-        scrsz = get(0,'ScreenSize'); % get the current screen size
-        obj.guiSize.left = round(scrsz(4) * .1); % location of left edge
-        obj.guiSize.bottom = scrsz(4) * .1; % location of bottom
-        overhang = (obj.guiSize.bottom + obj.guiSize.height)-scrsz(4); % adjust so gui doesn't hang off the top of the screen
-        if overhang > 0 % if positive value (meaning figure is off the screen)
-            overhang = overhang + 0; % give a little extra to account for top of the figure
-            %if overhang <= obj.guiSize.bottom % try to fix this problem
-                obj.guiSize.bottom = obj.guiSize.bottom - overhang; % correct for the overhang
-            %else % otherwise, do the best you can
-            %    obj.guiSize.bottom = 1; % put it as low as possible
-            %end
+        try % create new main figure
+            %[left, bottom,width, height]
+            obj.guiSize.width = 545; % figure width in pixels
+            obj.guiSize.height = 620; %625; %675; %750;
+            scrsz = get(0,'ScreenSize'); % get the current screen size
+            obj.guiSize.left = round(scrsz(4) * .1); % location of left edge
+            obj.guiSize.bottom = scrsz(4) * .1; % location of bottom
+            overhang = (obj.guiSize.bottom + obj.guiSize.height)-scrsz(4); % adjust so gui doesn't hang off the top of the screen
+            if overhang > 0 % if positive value (meaning figure is off the screen)
+                overhang = overhang + 0; % give a little extra to account for top of the figure
+                %if overhang <= obj.guiSize.bottom % try to fix this problem
+                    obj.guiSize.bottom = obj.guiSize.bottom - overhang; % correct for the overhang
+                %else % otherwise, do the best you can
+                %    obj.guiSize.bottom = 1; % put it as low as possible
+                %end
+            end
+            rect = [obj.guiSize.left, obj.guiSize.bottom, obj.guiSize.width, obj.guiSize.height];
+            obj.H = figure('Position',rect,'Color',[1 1 1],'Units','Pixels',...
+                'CloseRequestFcn',@obj.abort,'Name',['ARLas  version ',obj.arlasVersion],...
+                'NumberTitle','off','MenuBar','none','Resize','on','Color',[1 1 1],'Tag','ARLas');
+            % create panels within main gui figure -----
+            obj.CONTROL = uipanel('Parent',obj.H,'Title','CONTROL PANEL','FontSize',12,...
+                'BackgroundColor','white','Units','Pixels','Position',[10 10 105*5+4 140]);
+            obj.VIEW = uipanel('Parent',obj.H,'Title','VIEW','FontSize',12,...
+                'BackgroundColor','white','Units','Pixels','Position',[10 160 105*5+4 455]);     
+            % Populate control panel -----
+            obj.gui.height = 105;
+            obj.gui.width = 105;
+            obj.h_splash = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*0) 1 obj.gui.width*5 obj.gui.height],...
+                'Visible','on','CData',imread('splash.jpg'),'BusyAction','queue','Interruptible','off');
+            pause(2)
+            delete(obj.h_splash)
+            obj.h_init = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*0) 1 obj.gui.width obj.gui.height],...
+                'Callback',@obj.initPlayrec,'Visible','on','TooltipString','INITIALIZE playrec software',...
+                'CData',imread('initGray.jpg'),'BusyAction','queue','Interruptible','on');
+            obj.h_load = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*1) 1 obj.gui.width obj.gui.height],...
+                'Callback',@obj.loadExperiment,'Visible','on','TooltipString','LOAD experiment file',...
+                'CData',imread('loadGray.jpg'),'BusyAction','queue','Interruptible','on');
+            obj.h_pause = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*2) 1 obj.gui.width obj.gui.height],...
+                'Callback',@obj.pauseExperiment,'Visible','on','TooltipString','PAUSE experiment file',...
+                'CData',imread('pauseGray.jpg'),'BusyAction','queue','Interruptible','on');
+            obj.h_run = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*3) 1 obj.gui.width obj.gui.height],...
+                'Callback',@obj.runExperiment,'Visible','on','TooltipString','RUN experiment or calibration file',...
+                'CData',imread('runGray.jpg'),'BusyAction','queue','Interruptible','on');
+            obj.h_abort = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
+                'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*4) 1 obj.gui.width obj.gui.height],...
+                'Callback',@obj.abortExperiment,'Visible','on','TooltipString','ABORT current process',...
+                'CData',imread('abortGray.jpg'),'BusyAction','queue','Interruptible','on');
+            obj.buttonManager(10)
+        catch ME
+            errorTxt = {'  Issue: Error creating GUI.'
+                 '  Action: None.'
+                 '  Location: in arlas.initGui.'
+                };
+            errorMsgARLas(errorTxt);
+            obj.printError(ME)
         end
-        rect = [obj.guiSize.left, obj.guiSize.bottom, obj.guiSize.width, obj.guiSize.height];
-        obj.H = figure('Position',rect,'Color',[1 1 1],'Units','Pixels',...
-            'CloseRequestFcn',@obj.abort,'Name',['ARLas  version ',obj.arlasVersion],...
-            'NumberTitle','off','MenuBar','none','Resize','on','Color',[1 1 1],'Tag','ARLas');
-        % create panels within main gui figure -----
-        obj.CONTROL = uipanel('Parent',obj.H,'Title','CONTROL PANEL','FontSize',12,...
-            'BackgroundColor','white','Units','Pixels','Position',[10 10 105*5+4 140]);
-        obj.VIEW = uipanel('Parent',obj.H,'Title','VIEW','FontSize',12,...
-            'BackgroundColor','white','Units','Pixels','Position',[10 160 105*5+4 455]);     
-        % Populate control panel -----
-        obj.gui.height = 105;
-        obj.gui.width = 105;
-        obj.h_splash = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*0) 1 obj.gui.width*5 obj.gui.height],...
-            'Visible','on','CData',imread('splash.jpg'),'BusyAction','queue','Interruptible','off');
-        pause(2)
-        delete(obj.h_splash)
-        obj.h_init = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*0) 1 obj.gui.width obj.gui.height],...
-            'Callback',@obj.initPlayrec,'Visible','on','TooltipString','INITIALIZE playrec software',...
-            'CData',imread('initGray.jpg'),'BusyAction','queue','Interruptible','on');
-        obj.h_load = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*1) 1 obj.gui.width obj.gui.height],...
-            'Callback',@obj.loadExperiment,'Visible','on','TooltipString','LOAD experiment file',...
-            'CData',imread('loadGray.jpg'),'BusyAction','queue','Interruptible','on');
-        obj.h_pause = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*2) 1 obj.gui.width obj.gui.height],...
-            'Callback',@obj.pauseExperiment,'Visible','on','TooltipString','PAUSE experiment file',...
-            'CData',imread('pauseGray.jpg'),'BusyAction','queue','Interruptible','on');
-        obj.h_run = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*3) 1 obj.gui.width obj.gui.height],...
-            'Callback',@obj.runExperiment,'Visible','on','TooltipString','RUN experiment or calibration file',...
-            'CData',imread('runGray.jpg'),'BusyAction','queue','Interruptible','on');
-        obj.h_abort = uicontrol('Parent',obj.CONTROL,'Style','togglebutton',...
-            'BackgroundColor',[1 1 1],'Position',[(obj.gui.width*4) 1 obj.gui.width obj.gui.height],...
-            'Callback',@obj.abortExperiment,'Visible','on','TooltipString','ABORT current process',...
-            'CData',imread('abortGray.jpg'),'BusyAction','queue','Interruptible','on');
-        obj.buttonManager(10)
     end    
-    function buttonManager(varargin)
+    function buttonManager(varargin) % change colors and states of buttons on bottom bar
         obj = varargin{1};
-        code = varargin{2};
-        flickerLen = 0.1; % length of flicker for error notification
-        flickerReps = 5; % number of flickers
-        % 10s are for arlas gui
-        % 20s are for initializing the system
-        % 30s are for pausing 
-        % 40s are for loading experiment files
-        % 50s are for running
-        % 60s are for aborting
-        %
-        % the 'Tag' field is used to indicate whether a button can be used
-        % or not. Will be set to zero when its callback is currently
-        % running, as well.
-        switch code
-            case 10 % initialize arlas gui (FUNCTION initGui)
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            
-            case 20 % Begin initializing the system (FUNCTION initPlayrec)
-                set(obj.h_init,'Value',1,'Tag','off','CData',imread('initGreen.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 21 % -- unsuccessful initialization
-                for ii=1:flickerReps
-                    set(obj.h_init,'Value',1,'Tag','off','CData',imread('initRed.jpg'))
-                    pause(flickerLen)
-                    set(obj.h_init,'Value',1,'Tag','off','CData',imread('initGreen.jpg'))
-                    pause(flickerLen)
-                end
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initGreen.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 22 % -- successful initialization
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-                
-            case 30 % Begin pausing the system (FUNCTION pauseExperiment)
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseGreen.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 31 % -- unsuccessful pause
-                for ii=1:flickerReps
-                    set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseRed.jpg'))
-                    pause(flickerLen)
-                    set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseGreen.jpg'))
-                    pause(flickerLen)
-                end
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runGreen.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
-            case 32 % -- successful pause ON
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseGreen.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
-            case 33 % -- successful pause OFF
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runGreen.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
-                
-            case 40 % Begin loading experiment file (FUNCTION loadExperiment)
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadGreen.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 41 % -- failed to load experiment file
-                for ii=1:flickerReps
-                    set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadRed.jpg'))
-                    pause(flickerLen)
-                    set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadGreen.jpg'))
-                    pause(flickerLen)
-                end
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 42 % -- successfully loaded experiment file
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            
-            case 50 % Begin running an experiment file (FUNCTION runExperiment)
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadedGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
-                set(obj.h_run,'Value',1,'Tag','off','CData',imread('runGreen.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
-            case 51 % -- unsuccessfully ran experiment
-                for ii=1:flickerReps
-                    set(obj.h_run,'Value',1,'Tag','off','CData',imread('runRed.jpg'))
-                    pause(flickerLen)
-                    set(obj.h_run,'Value',1,'Tag','off','CData',imread('runGreen.jpg'))
-                    pause(flickerLen)
-                end
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 52 % -- successfully ran experiment
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+        try
+            code = varargin{2};
+            flickerLen = 0.1; % length of flicker for error notification
+            flickerReps = 5; % number of flickers
+            % 10s are for arlas gui
+            % 20s are for initializing the system
+            % 30s are for pausing 
+            % 40s are for loading experiment files
+            % 50s are for running
+            % 60s are for aborting
+            %
+            % the 'Tag' field is used to indicate whether a button can be used
+            % or not. Will be set to zero when its callback is currently
+            % running, as well.
+            switch code
+                case 10 % initialize arlas gui (FUNCTION initGui)
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
 
-            case 60 % Begin aborting run (FUNCTION abortExperiment)
-                set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
-                set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadedGray.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-                set(obj.h_abort,'Value',1,'Tag','off','CData',imread('abortRed.jpg'))
-            case 61 % -- failed to abort run
-                for ii=1:flickerReps
-                    set(obj.h_abort,'Value',1,'Tag','off','CData',imread('abortGray.jpg'))
-                    pause(flickerLen)
+                case 20 % Begin initializing the system (FUNCTION initPlayrec)
+                    set(obj.h_init,'Value',1,'Tag','off','CData',imread('initGreen.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 21 % -- unsuccessful initialization
+                    for ii=1:flickerReps
+                        set(obj.h_init,'Value',1,'Tag','off','CData',imread('initRed.jpg'))
+                        pause(flickerLen)
+                        set(obj.h_init,'Value',1,'Tag','off','CData',imread('initGreen.jpg'))
+                        pause(flickerLen)
+                    end
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initGreen.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 22 % -- successful initialization
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+
+                case 30 % Begin pausing the system (FUNCTION pauseExperiment)
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseGreen.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 31 % -- unsuccessful pause
+                    for ii=1:flickerReps
+                        set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseRed.jpg'))
+                        pause(flickerLen)
+                        set(obj.h_pause,'Value',1,'Tag','off','CData',imread('pauseGreen.jpg'))
+                        pause(flickerLen)
+                    end
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runGreen.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
+                case 32 % -- successful pause ON
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseGreen.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
+                case 33 % -- successful pause OFF
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runGreen.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
+
+                case 40 % Begin loading experiment file (FUNCTION loadExperiment)
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadGreen.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 41 % -- failed to load experiment file
+                    for ii=1:flickerReps
+                        set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadRed.jpg'))
+                        pause(flickerLen)
+                        set(obj.h_load,'Value',1,'Tag','off','CData',imread('loadGreen.jpg'))
+                        pause(flickerLen)
+                    end
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 42 % -- successfully loaded experiment file
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+
+                case 50 % Begin running an experiment file (FUNCTION runExperiment)
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadedGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','on','CData',imread('pauseYellow.jpg'))
+                    set(obj.h_run,'Value',1,'Tag','off','CData',imread('runGreen.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','on','CData',imread('abortRed.jpg'))
+                case 51 % -- unsuccessfully ran experiment
+                    for ii=1:flickerReps
+                        set(obj.h_run,'Value',1,'Tag','off','CData',imread('runRed.jpg'))
+                        pause(flickerLen)
+                        set(obj.h_run,'Value',1,'Tag','off','CData',imread('runGreen.jpg'))
+                        pause(flickerLen)
+                    end
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 52 % -- successfully ran experiment
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+
+                case 60 % Begin aborting run (FUNCTION abortExperiment)
+                    set(obj.h_init,'Value',0,'Tag','off','CData',imread('initGray.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadedGray.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
                     set(obj.h_abort,'Value',1,'Tag','off','CData',imread('abortRed.jpg'))
-                    pause(flickerLen)
-                end
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-            case 62 % -- successfully aborted run
-                set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-                set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
-                set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
-                set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
-                set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg')) 
-            otherwise
+                case 61 % -- failed to abort run
+                    for ii=1:flickerReps
+                        set(obj.h_abort,'Value',1,'Tag','off','CData',imread('abortGray.jpg'))
+                        pause(flickerLen)
+                        set(obj.h_abort,'Value',1,'Tag','off','CData',imread('abortRed.jpg'))
+                        pause(flickerLen)
+                    end
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
+                case 62 % -- successfully aborted run
+                    set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
+                    set(obj.h_load,'Value',0,'Tag','on','CData',imread('loadedYellow.jpg'))
+                    set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
+                    set(obj.h_run,'Value',0,'Tag','on','CData',imread('runYellow.jpg'))
+                    set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg')) 
+                otherwise
+            end
+            pause(.05)
+        catch
+            errorTxt = {'  Issue: Button management error.'
+                 '  Action: None.'
+                 '  Location: in arlas.buttonManager.'
+                };
+            errorMsgARLas(errorTxt);
+            obj.printError(ME)
         end
-        pause(.05)
-    end
-    function buttonReset(varargin) % "hard reset" of buttons to initial state. In case something gets frozen
-        obj = varargin{1};
-        set(obj.h_init,'Value',0,'Tag','on','CData',imread('initYellow.jpg'))
-        set(obj.h_pause,'Value',0,'Tag','off','CData',imread('calGray.jpg'))
-        set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
-        set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
-        set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
     end
     
     % define the five main functions ------------------
     function initPlayrec(varargin) % initialize playrec
         obj = varargin{1};
+        
         if strcmp(obj.h_init.Tag,'off')
             obj.h_init.Value = 0;
             return
@@ -633,139 +673,6 @@ methods
         obj.buttonManager(62) % aborted successfully
     end
     
-    function getSubjID(varargin) % display dialog box for subject, experiment, and operator ID
-        obj = varargin{1};
-        try
-            delete(obj.h_subjID)
-        catch
-        end
-        obj.subjID_OK = 0; % reset to zero
-        height = 105;
-        width = 105;
-        scrsz = get(0,'ScreenSize'); % get the current screen size
-        left = round(scrsz(4) * .05);
-        bottom = scrsz(4) * .1;        
-        bottom = bottom + (1.4*105);
-        rect = [left, bottom, width*5, height*2];
-        obj.h_subjID = figure('Position',rect);
-        set(obj.h_subjID,'Name',' ','NumberTitle','off','MenuBar','none','Resize','off','Color',[1 1 1])
-        left = 290; width = 150; height = 40; bottom = 150; % SUBJECT ID
-        obj.h_subjLabel = uicontrol('Style','text','String','Subject ID','FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
-        left = 30; width = 250; height = 30; bottom = 162;
-        obj.h_subjBox = uicontrol('Style','edit','String',obj.subjectID,'FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
-        left = 290; width = 150; height = 40; bottom = 110; % EXPERIMENT ID
-        obj.h_expLabel = uicontrol('Style','text','String','Experiment ID','FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
-        left = 30; width = 250; height = 30; bottom = 122;
-        obj.h_expBox = uicontrol('Style','edit','String',obj.experimentID,'FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
-        left = 290; width = 150; height = 40; bottom = 70; % OPERATOR INITIALS
-        obj.h_opLabel = uicontrol('Style','text','String','Operator Initials','FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
-        left = 30; width = 125; height = 30; bottom = 82;
-        obj.h_opBox = uicontrol('Style','edit','String',obj.operatorID,'FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
-            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
-        left = 385; width = 130; height = 50; bottom = 10;
-        obj.h_enterSubjID = uicontrol('Style','pushbutton','BackgroundColor',[1 1 0],...
-            'Position',[left bottom width height],'parent',obj.h_subjID,...
-            'String','Enter ID','FontSize',13,'Visible','on','BusyAction','cancel',...
-            'Interruptible','off','Callback',@obj.enterID);
-        
-    end
-
-    function enterID(varargin) % get subject, experiment, and operator IDs and save them; create folders
-        obj = varargin{1};
-        subjID = get(obj.h_subjBox,'String'); % check subject ID is present
-        if ~isempty(subjID)
-            obj.subjectID = subjID;
-        else
-            uiwait(errordlg('Subject ID cannot be an empty string.','Subject ID Error','modal'))
-            return
-        end
-        expID = get(obj.h_expBox,'String'); % check experiment ID is present
-        if ~isempty(expID)
-            d = dir(obj.map.data);
-            N = length(d);
-            match = 0;
-            for ii=3:N % look to see if experiment folder already exists
-                if d(ii).isdir
-                    if strcmp(d(ii).name,expID)
-                        match = 1;
-                    end
-                end
-                if match == 1
-                    break
-                end
-            end
-            if match
-                obj.experimentID = expID;
-            else
-                button = questdlg(['Experiment ID does not exist. Create new directory?'],...
-                    'Create Experiment Directory','Yes','No','No');
-                if strcmp(button,'No')
-                    return
-                else
-                    success = mkdir(obj.map.data,expID);
-                    if success
-                        addpath([obj.map.data,expID])
-                        obj.experimentID = expID;
-                    else
-                        error('Unable to create new Experiment Directory.')
-                    end
-                end
-            end
-            d = dir([obj.map.data,expID]);
-            N = length(d);
-            match = 0;
-            for ii=3:N % look for existing subject ID
-                if d(ii).isdir
-                    if strcmp(d(ii).name,obj.subjectID)
-                        match = 1;
-                    end
-                end
-                if match == 1
-                    break
-                end
-            end
-            if ~match
-                success = mkdir([obj.map.data,expID],obj.subjectID);
-                pathName = [obj.map.data,expID,obj.sep,obj.subjectID];
-                addpath(pathName)
-                if ~success
-                    error('Unable to create directory for subject ID.')
-                end
-            end
-        else
-            uiwait(errordlg('Experiment ID cannot be an empty string.','Experiment ID Error','modal'))
-            return
-        end
-        opID = get(obj.h_opBox,'String');
-        if ~isempty(opID)
-           obj.operatorID = opID;
-        else
-            uiwait(errordlg('Operator Initials cannot be an empty string.','Operator ID Error','modal'))
-            return
-        end
-        % if the ID input is all good, the following lines will execute
-        obj.subjID_OK = 1;
-        delete(obj.h_subjID)
-    end    
-    function printError(varargin)
-        obj = varargin{1};
-        ME = varargin{2};
-        disp(ME.identifier)
-        disp(ME.message)
-        disp(ME.stack(1).line)            
-    end
-    
     % functions that get and return values for use in experiment files --------
     function [samplingRate] = fs(varargin) % return the current sampling rate
         obj = varargin{1};
@@ -959,14 +866,64 @@ methods
             return
        end
     end
-    function nReps(varargin) % set the number of playback/record repetitions
+    function getRecList(varargin) % list the currently loaded input channels
         obj = varargin{1};
+        indx = find(obj.objPlayrec.recChanList);
+        nChans = length(indx);
+        disp(' ')
+        disp('Current recChanList: ')
+        for ii=1:nChans
+            ch = obj.objPlayrec.recChanList(1,indx(ii));
+            micSens = obj.objPlayrec.micSens(1,indx(ii));
+            ampGain = obj.objPlayrec.ampGain(1,indx(ii));
+            label = obj.objPlayrec.label{1,indx(ii)}; 
+            disp(' ')
+            disp([sprintf('%s','Channel Number = '),sprintf('%d',ch)])
+            disp([sprintf('%s','Mic Sensitivity = '),sprintf('%d',micSens)])
+            disp([sprintf('%s','Amplifier Gain = '),sprintf('%d',ampGain)])
+            disp([sprintf('%s','Channel Label = '),sprintf('%s',label)])
+        end
+    end
+    function getPlayList(varargin) % list the currently loaded output channels
+        obj = varargin{1};
+        indx = find(obj.objPlayrec.playChanList);
+        nChans = length(indx);
+        disp(' ')
+        disp('Current playChanList: ')
+        for ii=1:nChans
+            ch = obj.objPlayrec.playChanList(1,indx(ii));
+            disp(' ')
+            disp([sprintf('%s','Channel Number = '),sprintf('%d',ch)])
+        end
+    end
+    function setNReps(varargin) % set the number of playback/record repetitions
+        obj = varargin{1};
+        if nargin < 2
+            error('setNReps must be given an input argument. Example: obj.setNReps(50);')
+        end
         N = varargin{2};
-        if N < 1
-            error('number of repetitions mube be >= 1')
+        if N < 2
+            error('number of repetitions mube be > 1')
         end
         N = round(N); % force N to be an integer
-        obj.objPlayrec = N;
+        obj.objPlayrec.nReps = N;
+    end
+    function [nReps] = getNReps(varargin) % get the number of playback/record repetitions
+        obj = varargin{1};
+        nReps = obj.objPlayrec.nReps;
+    end
+    function setFilter(varargin) % turn on/off the HP IIR filter
+        obj = varargin{1};
+        toggle = varargin{2};
+        if toggle == 0 || toggle == 1
+            obj.objPlayrec.doFilter = toggle;
+        else
+            error('Input to setFilter must be 0 (off) or 1 (on).')
+        end
+    end
+    function [toggle] = getFilter(varargin) % turn on/off the HP IIR filter
+        obj = varargin{1};
+        toggle = obj.objPlayrec.doFilter;
     end
     function [header,data] = retrieveData(varargin) % return the header and recording matrix
         obj = varargin{1};
@@ -1003,7 +960,139 @@ methods
         header = dummy.header;
         data = dummy.data;
     end
-    
+
+    % define supporting functions
+    function getSubjID(varargin) % display dialog box for subject, experiment, and operator ID
+        obj = varargin{1};
+        try
+            delete(obj.h_subjID)
+        catch
+        end
+        obj.subjID_OK = 0; % reset to zero
+        height = 105;
+        width = 105;
+        scrsz = get(0,'ScreenSize'); % get the current screen size
+        left = round(scrsz(4) * .05);
+        bottom = scrsz(4) * .1;        
+        bottom = bottom + (1.4*105);
+        rect = [left, bottom, width*5, height*2];
+        obj.h_subjID = figure('Position',rect);
+        set(obj.h_subjID,'Name',' ','NumberTitle','off','MenuBar','none','Resize','off','Color',[1 1 1])
+        left = 290; width = 150; height = 40; bottom = 150; % SUBJECT ID
+        obj.h_subjLabel = uicontrol('Style','text','String','Subject ID','FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
+        left = 30; width = 250; height = 30; bottom = 162;
+        obj.h_subjBox = uicontrol('Style','edit','String',obj.subjectID,'FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
+        left = 290; width = 150; height = 40; bottom = 110; % EXPERIMENT ID
+        obj.h_expLabel = uicontrol('Style','text','String','Experiment ID','FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
+        left = 30; width = 250; height = 30; bottom = 122;
+        obj.h_expBox = uicontrol('Style','edit','String',obj.experimentID,'FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
+        left = 290; width = 150; height = 40; bottom = 70; % OPERATOR INITIALS
+        obj.h_opLabel = uicontrol('Style','text','String','Operator Initials','FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
+        left = 30; width = 125; height = 30; bottom = 82;
+        obj.h_opBox = uicontrol('Style','edit','String',obj.operatorID,'FontSize',13,...
+            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
+        left = 385; width = 130; height = 50; bottom = 10;
+        obj.h_enterSubjID = uicontrol('Style','pushbutton','BackgroundColor',[1 1 0],...
+            'Position',[left bottom width height],'parent',obj.h_subjID,...
+            'String','Enter ID','FontSize',13,'Visible','on','BusyAction','cancel',...
+            'Interruptible','off','Callback',@obj.enterID);
+        
+    end
+    function enterID(varargin) % get subject, experiment, and operator IDs and save them; create folders
+        obj = varargin{1};
+        subjID = get(obj.h_subjBox,'String'); % check subject ID is present
+        if ~isempty(subjID)
+            obj.subjectID = subjID;
+        else
+            uiwait(errordlg('Subject ID cannot be an empty string.','Subject ID Error','modal'))
+            return
+        end
+        expID = get(obj.h_expBox,'String'); % check experiment ID is present
+        if ~isempty(expID)
+            d = dir(obj.map.data);
+            N = length(d);
+            match = 0;
+            for ii=3:N % look to see if experiment folder already exists
+                if d(ii).isdir
+                    if strcmp(d(ii).name,expID)
+                        match = 1;
+                    end
+                end
+                if match == 1
+                    break
+                end
+            end
+            if match
+                obj.experimentID = expID;
+            else
+                button = questdlg(['Experiment ID does not exist. Create new directory?'],...
+                    'Create Experiment Directory','Yes','No','No');
+                if strcmp(button,'No')
+                    return
+                else
+                    success = mkdir(obj.map.data,expID);
+                    if success
+                        addpath([obj.map.data,expID])
+                        obj.experimentID = expID;
+                    else
+                        error('Unable to create new Experiment Directory.')
+                    end
+                end
+            end
+            d = dir([obj.map.data,expID]);
+            N = length(d);
+            match = 0;
+            for ii=3:N % look for existing subject ID
+                if d(ii).isdir
+                    if strcmp(d(ii).name,obj.subjectID)
+                        match = 1;
+                    end
+                end
+                if match == 1
+                    break
+                end
+            end
+            if ~match
+                success = mkdir([obj.map.data,expID],obj.subjectID);
+                pathName = [obj.map.data,expID,obj.sep,obj.subjectID];
+                addpath(pathName)
+                if ~success
+                    error('Unable to create directory for subject ID.')
+                end
+            end
+        else
+            uiwait(errordlg('Experiment ID cannot be an empty string.','Experiment ID Error','modal'))
+            return
+        end
+        opID = get(obj.h_opBox,'String');
+        if ~isempty(opID)
+           obj.operatorID = opID;
+        else
+            uiwait(errordlg('Operator Initials cannot be an empty string.','Operator ID Error','modal'))
+            return
+        end
+        % if the ID input is all good, the following lines will execute
+        obj.subjID_OK = 1;
+        delete(obj.h_subjID)
+    end    
+    function printError(varargin)
+        obj = varargin{1};
+        ME = varargin{2};
+        disp(ME.identifier)
+        disp(ME.message)
+        disp(ME.stack(1).line)            
+    end
     function [ok] = checkInput_ch(varargin) % check input arguments for the functions defineInput and defineOutput
         ok = 1;
         obj = varargin{1};

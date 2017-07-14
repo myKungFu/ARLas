@@ -12,6 +12,7 @@ classdef initARLas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
+    arlasVersion = '2017.07.14';
     obj         % passed from arlas
     initPath    % passed from arlas
     initFile    % passed from arlas
@@ -50,6 +51,7 @@ properties (SetAccess = private)
 end
 properties (SetAccess = public)
     % SYSTEM Data Structures
+    usingSavedValues % whether or not previously-saved values are being used
     devs            % list of devices and properties provided by initialization call to playrec
     os              % the operating system currently being used
     fs              % list of possible sampling rates for current selections
@@ -69,7 +71,6 @@ properties (SetAccess = public)
     id_in_now       % currently chosen value
     name_in_now     % currently chosen name
     chans_in        % possible number of channels to use
-    %chans_in_now    % curently chosen value
     
     % OUTPUT Data Structures
     deviceIndx_out % list of indices of output devices, given host API
@@ -78,20 +79,13 @@ properties (SetAccess = public)
     id_out_now     % currently chosen ID
     name_out_now   % currently chosen device name
     chans_out      % possible number of channels to use
-    %chans_out_now  % number of channels for currently chosen device
-
-%     label         % list of user-defined labels describing the input of each channel
-%     ampGain       % list of amplifier gain setting for each channel
-%     micSens       % list of microphone sensitivity for each channel
-%     label_now
-%     micSens_now
-%     ampGain_now
-    usingSavedValues % whether or not previously-saved values are being used
 end
-
 methods
     function objInit = initARLas(obj) % initialize object of class initARLas
         objInit.obj = obj; % object of class arlas
+        if obj.ping == 1
+            return
+        end
         objInit.initFile = obj.initFile;
         objInit.initPath = obj.initPath;
         objInit.usingSavedValues = 0; % defaults to not using saved values
@@ -130,9 +124,6 @@ methods
         objInit.VIEW = obj.VIEW;
     end  
     function abort(varargin) % instructions for aborting when gui closed
-        %objInit = pickObj(varargin);
-        %q = findobj('Type','fig'); % find any open figures
-        %delete(q); % and delete them
         delete(objInit);
     end
     function initGui(varargin) % initialize gui
@@ -793,7 +784,6 @@ methods
         end
     end
     
-
     function updateGui(varargin) % update the graphical user interface
         objInit = varargin{1};
         try
