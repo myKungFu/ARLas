@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: July 14, 2017
+% Last Updated: July 20, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -81,7 +81,16 @@ function [] = ARLasVersionInfo()
 %       for the largest value in the sequence and increments by 1.
 %       arlas.m now looks to make sure that the other two classes are of
 %       matching version numbers, otherwise alerts user to discrepancy.
-
+%
+% 2017.07.20
+%   Fixed playrecARLas to check for current Matlab version number and use
+%       the function strfind instead of contains if < 2016b is being used.
+%       in playrecARLas, now suppress all error messages except the first
+%       one. In playrecARLas, fix an error in retrieve data that was
+%       counting sample delay from delay instead of delay + 1 sample. In
+%       playrecARLas, updated to use playrec's system delay estimate if
+%       sufficienty close to user's measured delay.
+%
 
 
 
