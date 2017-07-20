@@ -8,11 +8,11 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: July 14, 2017
+% Last Updated: July 20, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.14';
+    arlasVersion = '2017.07.20';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -58,6 +58,7 @@ properties (SetAccess = private)
     plotDelay           % number of samples to shift plots to account for system delay
     skippedPages        % skipped page files
     failedRun           % determines whether page files have run out
+    deadInTheWater      % detemines whether error already occured and whether to print error msg
 end
 properties (SetAccess = public) 
     fs                  % sample rate
@@ -130,6 +131,7 @@ methods
             objPlayrec.setFilter % load the filters in case they need to be used
             objPlayrec.doFilter = 1; % default is to turn on filtering
             objPlayrec.failedRun = 0;
+            objPlayrec.deadInTheWater = 0;
         catch ME
             errorTxt = {'  Issue: Unexpected error creating object of class playrecARLas.'
                  '  Action: None.'
@@ -146,6 +148,10 @@ methods
             objPlayrec.killPlots
             delete(objPlayrec);
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end
             errorTxt = {'  Issue: Unexpected error destructing object of class playrecARLas.'
                  '  Action: None.'
                  '  Location: playrecARLas.abort.'
@@ -214,6 +220,10 @@ methods
                 'BackgroundColor','white','Value',1,'Units','Normalized',...
                 'Position',[.115 .12 .86 .03],'Callback',@objPlayrec.sliderManager2);
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end
             errorTxt = {'  Issue: Error initializing playrecARLas plots.'
                  '  Action: None.'
                  '  Location: playrecARLas.initDataPlot.'
@@ -240,6 +250,10 @@ methods
             try delete(objPlayrec.SLIDER1); catch; end
             try delete(objPlayrec.SLIDER2); catch; end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error deleting playrecARLas plots.'
                  '  Action: None.'
                  '  Location: playrecARLas.killPlots.'
@@ -258,6 +272,10 @@ methods
             objPlayrec.SLIDER2.Value = objPlayrec.xFinish(objPlayrec.CHAN_in.Value,1);
             objPlayrec.doPlot
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error setting which input channel to view.'
                  '  Action: None.'
                  '  Location: in playrecARLas.viewManager.'
@@ -277,6 +295,10 @@ methods
             objPlayrec.xStart(indx,1) = objPlayrec.SLIDER1.Value;
             objPlayrec.doPlot
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error setting slider 1.'
                  '  Action: None.'
                  '  Location: in playrecARLas.sliderManager1.'
@@ -296,6 +318,10 @@ methods
             objPlayrec.xFinish(indx,1) = objPlayrec.SLIDER2.Value;
             objPlayrec.doPlot
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error setting slider 2.'
                  '  Action: None.'
                  '  Location: in playrecARLas.sliderManager2.'
@@ -325,6 +351,12 @@ methods
             end
             objPlayrec.killPlots
         catch ME
+            objPlayrec.killRun = 1;
+            objPlayrec.killPlots
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Unexpected error running playrec.'
                  '  Action: None.'
                  '  Location: in playrecARLas.run.'
@@ -332,8 +364,6 @@ methods
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
             objPlayrec.printError(ME)
-            objPlayrec.killRun = 1;
-            objPlayrec.killPlots
         end
     end
     function engine(varargin) % sub-routine of run. Does a while loop to write data until finished, pause, or abort
@@ -371,6 +401,12 @@ methods
             objPlayrec.retrieveData % get the written raw data
             objPlayrec.saveData % save the data in mat files, one matrix per channel
         catch ME
+            objPlayrec.killRun = 1;
+            objPlayrec.killPlots
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Internal combustion failure ;-).'
                  '  Action: None.'
                  '  Location: in playrecARLas.engine.'
@@ -378,8 +414,6 @@ methods
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
             objPlayrec.printError(ME)
-            objPlayrec.killRun = 1;
-            objPlayrec.killPlots
         end
     end
     function initData(varargin) % initialize all variables
@@ -404,6 +438,12 @@ methods
                     ' of ',num2str(objPlayrec.nReps)])
             end
         catch ME
+            objPlayrec.killRun = 1;
+            objPlayrec.killPlots
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error initializing playrecARLas variables.'
                  '  Action: None.'
                  '  Location: in playrecARLas.initData.'
@@ -411,8 +451,6 @@ methods
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
             objPlayrec.printError(ME)
-            objPlayrec.killRun = 1;
-            objPlayrec.killPlots
         end
     end
     function initStream(varargin) % initialize streaming of recorded data to disk
@@ -445,6 +483,10 @@ methods
                         delete([objPlayrec.binFileName,'_',num2str(objPlayrec.chans_in_now(ii)),'.bin']); % file id, write append, read, native machine format (little-endian on windows machines)
                     end
                 catch ME
+                    if objPlayrec.deadInTheWater == 1
+                        return
+                    else objPlayrec.deadInTheWater = 1;
+                    end                    
                     errorTxt = {'  Issue: Error deleting old files.'
                          '  Action: None.'
                          '  Location: in playrecARLas.initStream.'
@@ -468,6 +510,10 @@ methods
                     objPlayrec.fid(1,ii) = fopen([objPlayrec.binFileName,'_',num2str(objPlayrec.chans_in_now(ii)),'.bin'],'a+'); % file id, write append, read, native machine format (little-endian on windows machines)
                 end
             catch ME
+                if objPlayrec.deadInTheWater == 1
+                    return
+                else objPlayrec.deadInTheWater = 1;
+                end                
                 errorTxt = {'  Issue: Error setting fid (file id) using fopen.'
                      '  Action: None.'
                      '  Location: in playrecARLas.initStream.'
@@ -486,6 +532,10 @@ methods
                 return
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Non-specific error initializing streaming files.'
                  '  Action: None.'
                  '  Location: in playrecARLas.initStream.'
@@ -541,6 +591,10 @@ methods
             indx = (1:1:objPlayrec.maxChans_in) * stepSize;
             objPlayrec.colorScheme = q(indx,:);
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error creating variables for plotting.'
                  '  Action: None.'
                  '  Location: in playrecARLas.makePlotVariables.'
@@ -594,6 +648,10 @@ methods
                 end                        
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error in basic stimulus check prior ot starting queue.'
                  '  Action: None.'
                  '  Location: in playrecARLas.queue.'
@@ -621,8 +679,13 @@ methods
                 %objPlayrec.systemDelay = round(fs*playLatency); % note: this
                 %was coming up too short; use the following command instead
             preferredDelay = round(fs*(recSuggestedLatency + playSuggestedLatency)); % system delay according to playrec
-            if (preferredDelay / objPlayrec.systemDelay) > 0.95
-                %objPlayrec.systemDelay = round(fs*(recSuggestedLatency + playSuggestedLatency));
+            if preferredDelay > objPlayrec.systemDelay
+                ratio = objPlayrec.systemDelay / preferredDelay;
+            else
+                ratio = preferredDelay / objPlayrec.systemDelay;
+            end
+            if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
+                objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
             else
                 disp(' ')
                 disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
@@ -636,6 +699,10 @@ methods
             objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
             objPlayrec.plotDelay = mod(objPlayrec.systemDelay,objPlayrec.nSamples); % how much delay (based on system delay) to account for when plotting
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error re-initializing playrec prior to building the queue.'
                  '  Action: None.'
                  '  Location: in playrecARLas.queue.'
@@ -678,6 +745,12 @@ methods
                 end
             end
         catch ME
+            objPlayrec.killRun = 1;
+            objPlayrec.killPlots            
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error queuing playrec.'
                  '  Action: None.'
                  '  Location: in playrecARLas.queue.'
@@ -685,8 +758,6 @@ methods
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
             objPlayrec.printError(ME)
-            objPlayrec.killRun = 1;
-            objPlayrec.killPlots            
         end
     end
     function writeData(varargin) % get the finished page files and write to disk
@@ -723,7 +794,11 @@ methods
                 end
                 return
             end
-        catch  ME
+        catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error checking pageFiles.'
                  '  Action: None.'
                  '  Location: in playrecARLas.writeData.'
@@ -751,6 +826,10 @@ methods
                Recording(:,kk) = Recording(:,kk) / 10^(objPlayrec.ampGain(kk+1)/20);  % apply input amplifier gain
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error retrieving pageFiles.'
                  '  Action: None.'
                  '  Location: in playrecARLas.writeData.'
@@ -767,6 +846,10 @@ methods
                 objPlayrec.completedBuffers = objPlayrec.completedBuffers + objPlayrec.completedPageFiles; % increment the files written to disk counter
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error writing recordings to disk. Probable error using fwrite.'
                  '  Action: None.'
                  '  Location: in playrecARLas.writeData.'
@@ -817,6 +900,10 @@ methods
                 objPlayrec.completedPageFiles = 0; % reset to zero
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error updating waveform plots.'
                  '  Action: None.'
                  '  Location: in playrecARLas.writeData.'
@@ -886,6 +973,12 @@ methods
             %pause(0.0001)
             %figure(orig)
         catch ME
+            objPlayrec.killRun = 1;
+            objPlayrec.killPlots
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             if objPlayrec.completedBuffers == 0
                 return
             end
@@ -896,8 +989,6 @@ methods
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
             objPlayrec.printError(ME)
-            objPlayrec.killRun = 1;
-            objPlayrec.killPlots
         end
     end
     function retrieveData(varargin) % get the raw data that were written to the disk
@@ -916,6 +1007,10 @@ methods
                 return
             end            
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error retrieving written data.'
                  '  Action: None.'
                  '  Location: in playrecARLas.retrieveData.'
@@ -942,7 +1037,7 @@ methods
                 end
                 expectedLength = (objPlayrec.completedBuffers) * objPlayrec.nSamples; % number of samples to read in
                 X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
-                X = X(objPlayrec.systemDelay:end); % cut off the leading system delay
+                X = X(objPlayrec.systemDelay+1:end); % cut off the leading system delay
                 X = X(1:end-mod(length(X),objPlayrec.nSamples)); % cut off the resulting trailing edge
                 expectedLength = objPlayrec.nReps * objPlayrec.nSamples; % number of samples after shifting to fix system delay
                 actualLength = floor(length(X)/objPlayrec.nSamples) * objPlayrec.nSamples; % actual length may be different if aborted
@@ -972,6 +1067,10 @@ methods
             end
             objPlayrec.cleanUp
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error reading saved data.'
                  '  Action: None.'
                  '  Location: in playrecARLas.retrieveData.'
@@ -1006,7 +1105,14 @@ methods
                 hitCounter = 1;
                 if nFiles > 0 % look for all the files with the same base file name (not including incrementing tag)
                     for jj=1:nFiles
-                        dummy = contains(d(jj).name,fileName);
+                        if verLessThan('matlab', '9.1') % the function 'contains.m' was introduced in 2016b (9.1) version of matlab
+                            dummy = strfind(d(jj).name,fileName);
+                            if ~isempty(dummy)
+                                dummy = 1;
+                            end
+                        else
+                            dummy = contains(d(jj).name,fileName);
+                        end
                         if dummy == 1
                             hitIndx(hitCounter,1) = jj;
                             hitCounter = hitCounter + 1;
@@ -1043,6 +1149,10 @@ methods
                 tag = num2str(counter);
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             errorTxt = {'  Issue: Error determining save information (location, filename, or incrementing tag).'
                  '  Action: Data not saved.'
                  '  Location: in playrecARLas.saveData.'
@@ -1108,7 +1218,11 @@ methods
                 objPlayrec.savedFilesPath = pathName; % tell arlas what the most recent save was (location)
             end
         catch ME
-           errorTxt = {'  Issue: Error preping and saving data.'
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
+            errorTxt = {'  Issue: Error preping and saving data.'
                  '  Action: Data not saved.'
                  '  Location: in playrecARLas.saveData.'
                 };
@@ -1126,6 +1240,10 @@ methods
                 end
             end
         catch ME
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
             warnTxt = {'  Issue: Error using fopen or fclose.'
                  '  Action: Check to see if open fid still exist.'
                  '  Location: in playrecARLas.cleanUp.'
@@ -1376,7 +1494,11 @@ methods
                 objPlayrec.ORDER = 20;
             end
         catch ME
-           errorTxt = {'  Issue: Error obtaining IIR filter coefficients.'
+            if objPlayrec.deadInTheWater == 1
+                return
+            else objPlayrec.deadInTheWater = 1;
+            end            
+            errorTxt = {'  Issue: Error obtaining IIR filter coefficients.'
                  '  Action: Unable to filter. Aborting run.'
                  '  Location: in playrecARLas.setFilter.'
                 };

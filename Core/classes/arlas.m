@@ -8,11 +8,11 @@ classdef arlas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
-% Last Updated: July 13, 2017
+% Last Updated: July 20, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.14';
+    arlasVersion = '2017.07.20';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -49,7 +49,8 @@ properties (SetAccess = private)
     enterSubjID
     h_enterSubjID
     subjID_OK
-    ping
+    ping                % used to determine whether the same versions of all arlas class files are being used
+    deadInTheWater      % detemines whether error already occured and whether to print error msg
 end
 properties (SetAccess = public) 
     objInit % object of class initARLas (initialization)
@@ -172,6 +173,7 @@ methods
             warnMsgARLas(warnTxt);
         end
         obj.ping = 0;
+        obj.deadInTheWater = 0;
     end  
     function abort(varargin) % instructions for aborting when gui closed
         try
@@ -253,6 +255,11 @@ methods
                 'CData',imread('abortGray.jpg'),'BusyAction','queue','Interruptible','on');
             obj.buttonManager(10)
         catch ME
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
             errorTxt = {'  Issue: Error creating GUI.'
                  '  Action: None.'
                  '  Location: in arlas.initGui.'
@@ -284,7 +291,6 @@ methods
                     set(obj.h_pause,'Value',0,'Tag','off','CData',imread('pauseGray.jpg'))
                     set(obj.h_run,'Value',0,'Tag','off','CData',imread('runGray.jpg'))
                     set(obj.h_abort,'Value',0,'Tag','off','CData',imread('abortGray.jpg'))
-
                 case 20 % Begin initializing the system (FUNCTION initPlayrec)
                     set(obj.h_init,'Value',1,'Tag','off','CData',imread('initGreen.jpg'))
                     set(obj.h_load,'Value',0,'Tag','off','CData',imread('loadGray.jpg'))
@@ -431,79 +437,109 @@ methods
     % define the five main functions ------------------
     function initPlayrec(varargin) % initialize playrec
         obj = varargin{1};
-        
-        if strcmp(obj.h_init.Tag,'off')
-            obj.h_init.Value = 0;
-            return
-        end
-        try
-            obj.objPlayrec.killPlots % if there are any open playrecARLas figures, make them disappear
+        try % if init tag is set to off (not available), return
+            if strcmp(obj.h_init.Tag,'off') 
+                obj.h_init.Value = 0;
+                return
+            else
+                obj.deadInTheWater = 0;
+            end
         catch
-        try
+        end
+        try % set init button to on and other buttons to off
+            obj.buttonManager(20)
+            set(obj.VIEW,'Title','VIEW: Initialize')
+        catch
+        end
+        try % get rid of any open figures from playrecARLas
+            obj.objPlayrec.killPlots % if there are any open playrecARLas figures, make them disappear
             delete(obj.objPlayrec) % delete any currently open playrecARLas objects
         catch
         end            
-        end
-        obj.buttonManager(20)
-        set(obj.VIEW,'Title','VIEW: Initialize')
-        try 
+        try % get rid of any open figures from initARLas
             obj.objInitARLas.killPlots
             delete(obj.objInitARLas);
         catch
         end
-        try
-            obj.objPlayrec.killPlots
-        catch
-        end
-        obj.objInit = initARLas(obj); % instantiate an object of class initARLas
-        obj.objInit.initGui % create the gui
-        d = dir([obj.map.sysConfigs,'*.mat']); % look for previously saved initialization files
-        if size(d,1) >= 1 % if files exist
-            % ask user which one to use
-            [fileName,pathName] = uigetfile([obj.map.sysConfigs,'*.mat'],'Select the initialization file.');
-            if fileName == 0 % if user canceled and did not pick a file
-                obj.buttonManager(21) % flash an error and discover new files
-                obj.objInit.discover
-                return
-            end
-            try % if previously saved initialization values exist, try to use them
-                dummy = load([pathName,fileName]); % load the saved initialization
-                obj.objInit.trySavedValues(dummy);
-                obj.buttonManager(22)
-            catch ME %-----------------------------------------------------
-                errorTxt = {'  Issue: Unable to initialize: arlas.m using saved values, function init.playrec.'
-                     '  Action:  Create new initialization.'
+        try % instantiate a new object of class initARLas
+            obj.objInit = initARLas(obj); % instantiate a new object of class initARLas
+            obj.objInit.initGui % create the init gui
+            d = dir([obj.map.sysConfigs,'*.mat']); % look for previously saved initialization files
+            if size(d,1) >= 1 % if files exist
+                % ask user which one to use
+                [fileName,pathName] = uigetfile([obj.map.sysConfigs,'*.mat'],'Select the initialization file.');
+                if fileName == 0 % if user canceled and did not pick a file
+                    obj.buttonManager(21) % flash an error and discover new files
+                    obj.objInit.discover
+                    return
+                end
+                try % if previously saved initialization values exist, try to use them
+                    dummy = load([pathName,fileName]); % load the saved initialization
+                    obj.objInit.trySavedValues(dummy);
+                    obj.buttonManager(22)
+                catch ME %-----------------------------------------------------
+                    if obj.deadInTheWater == 1
+                        return
+                    else obj.deadInTheWater = 1;
+                    end                                
+                    errorTxt = {'  Issue: Unable to initialize: arlas.m using saved values, function init.playrec.'
+                         '  Action:  Create new initialization.'
+                         '  Location: arlas.initPlayrec.'
+                        };
+                    errorMsgARLas(errorTxt);
+                    obj.buttonManager(21)
+                    obj.printError(ME)
+                end
+            else
+                alertTxt = {'  Issue: No saved System Configuration Files wre detected.'
+                     '  Action:  Discovering current system devices.'
                      '  Location: arlas.initPlayrec.'
                     };
-                errorMsgARLas(errorTxt);
+                alertMsgARLas(alertTxt);
                 obj.buttonManager(21)
-                obj.printError(ME)
+                obj.objInit.discover
+                set(obj.VIEW,'Title','VIEW: ')
             end
-        else
-            alertTxt = {'  Issue: No saved System Configuration Files wre detected.'
-                 '  Action:  Discovering current system devices.'
+        catch ME
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
+            errorTxt = {'  Issue: Unable to initialize: Unexpeced error.'
+                 '  Action:  None.'
                  '  Location: arlas.initPlayrec.'
                 };
-            alertMsgARLas(alertTxt);
+            errorMsgARLas(errorTxt);
             obj.buttonManager(21)
-            obj.objInit.discover
-            set(obj.VIEW,'Title','VIEW: ')
+            obj.printError(ME)            
         end
     end
     function loadExperiment(varargin)
         obj = varargin{1};
-        if strcmp(obj.h_load.Tag,'off')
-            obj.h_load.Value = 0;
-            return
-        end
-        try
-            obj.objInit.killPlots
-            %obj.objInit.makeInvisible % invisible the initialization gui
+        try % if init tag is set to off (not available), return
+            if strcmp(obj.h_init.Tag,'off') 
+                obj.h_init.Value = 0;
+                return
+            else
+                obj.deadInTheWater = 0;
+            end
         catch
         end
-        obj.buttonManager(40)
-        set(obj.VIEW,'Title','VIEW: Load Experiment File')
+        try % if load tag is set to off (not available), return
+            if strcmp(obj.h_load.Tag,'off')
+                obj.h_load.Value = 0;
+                return
+            end
+        catch
+        end
+        try % get rid of any existing objInit plots
+            obj.objInit.killPlots
+        catch
+        end
         try % attempt to load an experiment file
+            obj.buttonManager(40)
+            set(obj.VIEW,'Title','VIEW: Load Experiment File')
             obj.expPathName = obj.map.experiments;
             obj.expFileName = uigetfile([obj.expPathName,obj.sep,'*.m'],'Load Experiment File');
             if obj.expFileName == 0 % if user canceled and did not pick a file
@@ -522,23 +558,43 @@ methods
             obj.printError(ME)
             return
         end
-        if ~obj.expFileName  % if no experiment file was chosen or process was aborted
-            obj.h_load.TooltipString = 'LOAD experiment file';
-            obj.buttonManager(41)
-        else % if an experiment file was chosen
-            obj.h_load.TooltipString = ['LOADED EXPERIMENT: ',obj.expFileName];
-            obj.buttonManager(42)
+        try % set the tool-tip string
+            if ~obj.expFileName  % if no experiment file was chosen or process was aborted
+                obj.h_load.TooltipString = 'LOAD experiment file';
+                obj.buttonManager(41)
+            else % if an experiment file was chosen
+                obj.h_load.TooltipString = ['LOADED EXPERIMENT: ',obj.expFileName];
+                obj.buttonManager(42)
+            end
+        catch ME
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
+            errorTxt = {'  Issue: Unable to load experiment: Unexpeced error.'
+                 '  Action:  None.'
+                 '  Location: arlas.load.'
+                };
+            errorMsgARLas(errorTxt);
+            obj.buttonManager(21)
+            obj.printError(ME)            
         end
     end
     function pauseExperiment(varargin) % pause the currently-running experiment
         obj = varargin{1};
-        if strcmp(obj.h_pause.Tag,'off')
-            obj.h_pause.Value = 0;
-            return
+        try % if pause tag is set to off (not available), return
+            if strcmp(obj.h_pause.Tag,'off')
+                obj.h_pause.Value = 0;
+                return
+            else
+                obj.deadInTheWater = 0;
+            end
+            catch
         end
-        obj.buttonManager(30) % starting pause routine...
-        pause(0.001)
-        try
+        try % turn pause on or off
+            obj.buttonManager(30) % starting pause routine...
+            pause(0.001)
             if obj.objPlayrec.pauseRun == 1 % if the run is already paused
                 obj.buttonManager(33)
                 pause(0.001)
@@ -548,6 +604,11 @@ methods
                 obj.objPlayrec.pauseRun = 1; % turn pause on
             end
         catch ME
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
             errorTxt = {'  Issue: Error pausing playrec.'
                  '  Action:  None.'
                  '  Location: arlas.pauseExperiment.'
@@ -561,21 +622,36 @@ methods
     end
     function runExperiment(varargin) % run the currently-loaded experiment
         obj = varargin{1};
-        if strcmp(obj.h_run.Tag,'off')
-            obj.h_run.Value = 0;
-            return
+        try % if run tag is set to off (not available), return
+            if strcmp(obj.h_run.Tag,'off')
+                obj.h_run.Value = 0;
+                return
+            else
+                obj.deadInTheWater = 0;
+            end
+        catch
         end
-        try
+        try % get rid of any existing objInit plots
             obj.objInit.killPlots
         catch
         end
-        obj.buttonManager(50)
-        set(obj.VIEW,'Title','VIEW: Playback & Record')
-        obj.killRun = 0;
         try % get the subject, experiment, and operator IDs
+            obj.buttonManager(50)
+            set(obj.VIEW,'Title','VIEW: Playback & Record')
+            obj.killRun = 0;
             obj.getSubjID
             uiwait(obj.h_subjID) % wait until the figure is closed
+            if obj.subjID_OK == 0
+                obj.buttonManager(51) % unsuccessful; possibly user closed box with upper right x
+                set(obj.VIEW,'Title','VIEW: ')
+                return
+            end
         catch ME
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
             errorTxt = {'  Issue: Error getting subject ID.'
                  '  Action: None.'
                  '  Location: in arlas.runExperiment.'
@@ -586,19 +662,19 @@ methods
             set(obj.VIEW,'Title','VIEW: ')
             return
         end
-        if obj.subjID_OK == 0
-            obj.buttonManager(51) % unsuccessful; possibly user closed box with upper right x
-            set(obj.VIEW,'Title','VIEW: ')
-            return
-        end
         try % run the experiment
-            try
-                delete(obj.objPlayrec) % delete any currently open playrecARLas objects
+            try % delete any currently open playrecARLas objects
+                delete(obj.objPlayrec) 
             catch
             end
-            try
-                obj.objPlayrec = playrecARLas(obj.objInit); % initialize a new object of class playrecARLas
+            try % initialize a new object of class playrecARLas
+                obj.objPlayrec = playrecARLas(obj.objInit); 
             catch ME
+                if obj.deadInTheWater == 1
+                    return
+                else
+                    obj.deadInTheWater = 1;
+                end                                      
                 errorTxt = {'  Issue: Error creating new playrecARLas object.'
                      '  Action: None.'
                      '  Location: in arlas.runExperiment.'
@@ -609,8 +685,21 @@ methods
                 set(obj.VIEW,'Title','VIEW: ')
                 return
             end
-            feval(obj.expFileName,obj); % Here is where we run the experiment file ---------------
+            try % try executing the experiment file
+                fh = str2func(obj.expFileName);
+                fh(obj);
+                obj.buttonManager(52) % successful completion
+                set(obj.VIEW,'Title','VIEW: ')
+            catch
+            end
         catch ME
+            obj.objPlayrec.killPlots % get rid of playrecARLas plots
+            obj.killRun = 1;
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                
             if obj.objPlayrec.killRun == 1
                  errorTxt = {'  Issue: Run aborted by user.'
                      '  Action: Run stopped early.'
@@ -619,8 +708,6 @@ methods
                 errorMsgARLas(errorTxt);
                 obj.buttonManager(51)
                 obj.printError(ME)
-                obj.objPlayrec.killPlots % get rid of playrecARLas plots
-                obj.killRun = 1;
                 return
             else
                 errorTxt = {'  Issue: Error in experiment file.'
@@ -631,23 +718,27 @@ methods
                 errorMsgARLas(errorTxt);
                 obj.buttonManager(51)
                 obj.printError(ME)    
-                obj.objPlayrec.killPlots % get rid of playrecARLas plots
-                obj.killRun = 1;                
             end
             return
         end
-        obj.buttonManager(52) % successful completion
-        set(obj.VIEW,'Title','VIEW: ')
     end
     function abortExperiment(varargin) % abort the currently-running experiment
         obj = varargin{1};
-        if strcmp(obj.h_abort.Tag,'off')
-            obj.h_abort.Value = 0;
-            return
+        try % if abort tag is set to off (not available), return
+            if strcmp(obj.h_abort.Tag,'off')
+                obj.h_abort.Value = 0;
+                return
+            else
+                obj.deadInTheWater = 0;
+            end
+        catch
         end
-        obj.buttonManager(60)
-        set(obj.VIEW,'Title','VIEW: Abort')
-        try
+        try % manage abort buttons and view
+            obj.buttonManager(60)
+            set(obj.VIEW,'Title','VIEW: Abort')
+        catch
+        end
+        try % try and abort sequence
             obj.objPlayrec.killRun = 1;
             obj.killRun = 1;
             pause(0.5)
@@ -656,7 +747,12 @@ methods
             catch
             end
         catch ME
-             errorTxt = {'  Issue: Unsuccessful abort attempt.'
+            if obj.deadInTheWater == 1
+                return
+            else
+                obj.deadInTheWater = 1;
+            end                                        
+            errorTxt = {'  Issue: Unsuccessful abort attempt.'
                  '  Action: Abort not completed.'
                  '  Location: in arlas.abortExperiment.'
                 };
@@ -665,12 +761,14 @@ methods
             obj.printError(ME)
             return
         end
-        try
+        try % get rid of remaining plots
             obj.objPlayrec.killPlots
-            %obj.objPlayrec.makeInvisible % if there are any open playrecARLas figures, make them disappear
         catch
         end
-        obj.buttonManager(62) % aborted successfully
+        try % report aborted successfully
+            obj.buttonManager(62) 
+        catch
+        end
     end
     
     % functions that get and return values for use in experiment files --------
