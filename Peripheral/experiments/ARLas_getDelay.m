@@ -9,12 +9,12 @@ function [] = ARLas_getDelay(varargin)
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: January 9, 2017
-% Last Updated: January 9, 2017
+% Last Updated: July 20, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %--------------------- SET THESE VALUE BEFORE RUNNING! --------------------
-outputChannel = 8;
-inputChannel = 8;
+outputChannel = 1;
+inputChannel = 1;
 % Make a direct electrical connnection between these two channels.
 % Then run the experiment file.
 %--------------------------------------------------------------------------
@@ -62,10 +62,9 @@ obj.objPlayrec.systemDelay = 0; % set to zero in order to measure
 
 % 3) PLAYBACK & RECORD ----------------------------------------------------
 obj.objPlayrec.run % run the stimulus
-ok = obj.checkForErrors;
-if ~ok
-   return
-end
+    if obj.killRun
+       return
+    end    
 
 % 4) RETRIEVE DATA ----------------------------------------------------
 [header0,data0] = obj.retrieveData(['Ch',num2str(inputChannel)]);
