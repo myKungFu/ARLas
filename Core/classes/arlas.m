@@ -125,13 +125,19 @@ methods
                 OK = 0;
             end
             if exist(obj.map.sysConfigs,'dir') ~= 7
-                OK = 0;
+                try 
+                    mkdir(obj.map.sysConfigs)
+                    addpath(genpath(obj.map.sysConfigs)) 
+                catch
+                    OK = 0;
+                end
             end
             if exist(obj.map.data,'dir') ~= 7
                 try 
                     mkdir(obj.map.data)
                     addpath(genpath(obj.map.data)) 
                 catch
+                    OK = 0;
                 end
             end
             if exist(obj.map.data,'dir') ~= 7
