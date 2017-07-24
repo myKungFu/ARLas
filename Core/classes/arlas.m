@@ -8,11 +8,11 @@ classdef arlas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
-% Last Updated: July 20, 2017
+% Last Updated: July 24, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.20';
+    arlasVersion = '2017.07.24';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -66,114 +66,123 @@ properties (SetAccess = public)
 end
 methods
     function obj = arlas(~) % initialize object of class initARLas
-        obj.sep = filesep; % get the path delimiter appropriate to the operating system being used
-        dummy = which('arlas'); % get the location of the currently-running verison of arlas.m
-        indx = length(dummy); % strip off the file name at the end
-        stop = 0;
-        while ~stop
-            if strcmp(dummy(indx),obj.sep)
-                stop = 1;
-                dummy = dummy(1:indx); % location of arlas
-                base = dummy(1:end-13); % base location is dummy less the 13 characters: Core\classes\
+        try
+            obj.sep = filesep; % get the path delimiter appropriate to the operating system being used            
+            dummy = which('arlas'); % get the location of the currently-running verison of arlas.m
+            indx = length(dummy); % strip off the file name at the end
+            stop = 0;
+            while ~stop
+                if strcmp(dummy(indx),obj.sep)
+                    stop = 1;
+                    dummy = dummy(1:indx); % location of arlas
+                    base = dummy(1:end-13); % base location is dummy less the 13 characters: Core\classes\
+                end
+                indx = indx - 1;
+                if indx < 1
+                    errorTxt = {'  Issue: Unable to path location of currently running version of ARLas.'
+                         '  Action: Aborting initialization.'
+                         '  Location: arlas.arlas.'
+                        };
+                    errorMsgARLas(errorTxt);
+                    return
+                end
             end
-            indx = indx - 1;
-            if indx < 1
-                errorTxt = {'  Issue: Unable to path location of currently running version of ARLas.'
-                     '  Action: Aborting initialization.'
-                     '  Location: arlas.arlas.'
-                    };
+            obj.home = pwd; % get the current working directory
+            addpath(genpath(base)) % add all directories and subdirectories 
+            cd(base) % change directory to the base location (will change directories back home upon exit)
+            format compact % save space in command window
+            % create a map to needed directories
+            obj.map.calibrations = [base,'Peripheral',obj.sep,'calibrations',obj.sep];
+            obj.map.experiments = [base,'Peripheral',obj.sep,'experiments',obj.sep];
+            obj.map.sysConfigs = [base,'Peripheral',obj.sep,'sysConfigs',obj.sep];
+            obj.map.data = [base,'Data',obj.sep];
+            % check to make sure that these directories exist; if not, alert user
+            errorTxt = {'  Issue: Unexpected ARLas directory structure found.'
+                 '  Action:  Aborting ARLas.'
+                 '  Location: arlas.initPlayrec.'
+                 '  Recommended Fix: Make sure the following ARLas structure exists:.'
+                 '  ------------------------------------ '
+                 '   ARLas (base directory)'
+                 '     \\Core'
+                 '         \\classes (* Note: The file arlas.m is located here.)'
+                 '             \\classSupport'
+                 '         \\general'
+                 '         \\gui'
+                 '         \\playrec'
+                 '     \\Peripheral'
+                 '         \\analysis'
+                 '         \\calibrations'
+                 '         \\experiments'
+                 '         \\sysConfigs'
+                 '     \\Data'
+                 '  ------------------------------------ '
+                };
+            OK = 1;
+            if exist(obj.map.calibrations,'dir') ~= 7
+                OK = 0;
+            end
+            if exist(obj.map.experiments,'dir') ~= 7
+                OK = 0;
+            end
+            if exist(obj.map.sysConfigs,'dir') ~= 7
+                OK = 0;
+            end
+            if exist(obj.map.data,'dir') ~= 7
+                try 
+                    mkdir(obj.map.data)
+                    addpath(genpath(obj.map.data)) 
+                catch
+                end
+            end
+            if exist(obj.map.data,'dir') ~= 7
+                OK = 0;
+            end
+            if OK == 0
                 errorMsgARLas(errorTxt);
                 return
             end
-        end
-        obj.home = pwd; % get the current working directory
-        addpath(genpath(base)) % add all directories and subdirectories 
-        cd(base) % change directory to the base location (will change directories back home upon exit)
-        format compact % save space in command window
-        % create a map to needed directories
-        obj.map.calibrations = [base,'Peripheral',obj.sep,'calibrations',obj.sep];
-        obj.map.experiments = [base,'Peripheral',obj.sep,'experiments',obj.sep];
-        obj.map.sysConfigs = [base,'Peripheral',obj.sep,'sysConfigs',obj.sep];
-        obj.map.data = [base,'Data',obj.sep];
-        % check to make sure that these directories exist; if not, alert user
-        errorTxt = {'  Issue: Unexpected ARLas directory structure found.'
-             '  Action:  Aborting ARLas.'
-             '  Location: arlas.initPlayrec.'
-             '  Recommended Fix: Make sure the following ARLas structure exists:.'
-             '  ------------------------------------ '
-             '   ARLas (base directory)'
-             '     \\Core'
-             '         \\classes (* Note: The file arlas.m is located here.)'
-             '             \\classSupport'
-             '         \\general'
-             '         \\gui'
-             '         \\playrec'
-             '     \\Peripheral'
-             '         \\analysis'
-             '         \\calibrations'
-             '         \\experiments'
-             '         \\sysConfigs'
-             '     \\Data'
-             '  ------------------------------------ '
-            };
-        OK = 1;
-        if exist(obj.map.calibrations,'dir') ~= 7
-            OK = 0;
-        end
-        if exist(obj.map.experiments,'dir') ~= 7
-            OK = 0;
-        end
-        if exist(obj.map.sysConfigs,'dir') ~= 7
-            OK = 0;
-        end
-        if exist(obj.map.data,'dir') ~= 7
-            try 
-                mkdir(obj.map.data)
-                addpath(genpath(obj.map.data)) 
-            catch
-            end
-        end
-        if exist(obj.map.data,'dir') ~= 7
-            OK = 0;
-        end
-        if OK == 0
-            errorMsgARLas(errorTxt);
-            return
-        end
-        obj.initPath = obj.map.sysConfigs;
-        obj.initFile = 'newSysConfig.mat';
-        obj.initGui % initialize the gui
+            obj.initPath = obj.map.sysConfigs;
+            obj.initFile = 'newSysConfig.mat';
+            obj.initGui % initialize the gui
 
-        v0 = obj.arlasVersion;
-        obj.ping = 1;
-        test1 = initARLas(obj); % instantiate an object of class initARLas
-        v1 = [];
-        try v1 = test1.arlasVersion; catch; end
-        test2 = playrecARLas(test1); % instantiate an object of class initARLas
-        v2 = [];
-        try v2 = test2.arlasVersion; catch; end
-        delete(test1)
-        delete(test2)
-        fail = 0;
-        if isempty(v0) || isempty(v0) || isempty(v2)
-            fail = 1;
-        end
-        if ~strcmp(v0,v1)
-            fail = 1;
-        end
-        if ~strcmp(v0,v2)
-            fail = 1;
-        end
-        if fail == 1
-            warnTxt = {'  Issue: Mismatch detected between arlas versions.'
-                 '  Action:  Update to most current verion: https://github.com/myKungFu/ARLas.'
-                 '           Ensure that arlas.m, initARLAs.m, and playrecARLas.m are all the same version.'
-                 '           Failure to correct this may result in unstable performance!'
+            v0 = obj.arlasVersion;
+            obj.ping = 1;
+            test1 = initARLas(obj); % instantiate an object of class initARLas
+            v1 = [];
+            try v1 = test1.arlasVersion; catch; end
+            test2 = playrecARLas(test1); % instantiate an object of class initARLas
+            v2 = [];
+            try v2 = test2.arlasVersion; catch; end
+            delete(test1)
+            delete(test2)
+            fail = 0;
+            if isempty(v0) || isempty(v0) || isempty(v2)
+                fail = 1;
+            end
+            if ~strcmp(v0,v1)
+                fail = 1;
+            end
+            if ~strcmp(v0,v2)
+                fail = 1;
+            end
+            if fail == 1
+                warnTxt = {'  Issue: Mismatch detected between arlas versions.'
+                     '  Action:  Update to most current verion: https://github.com/myKungFu/ARLas.'
+                     '           Ensure that arlas.m, initARLAs.m, and playrecARLas.m are all the same version.'
+                     '           Failure to correct this may result in unstable performance!'
+                    };
+                warnMsgARLas(warnTxt);
+            end
+            obj.ping = 0;
+            obj.deadInTheWater = 0;
+        catch ME
+            errorTxt = {'  Issue: Unexpected error creating object of class arlas.'
+                 '  Action: None.'
+                 '  Location: arlas.'
                 };
-            warnMsgARLas(warnTxt);
+            errorMsgARLas(errorTxt);
+            objPlayrec.printError(ME)
         end
-        obj.ping = 0;
-        obj.deadInTheWater = 0;
     end  
     function abort(varargin) % instructions for aborting when gui closed
         try
@@ -194,7 +203,7 @@ methods
             delete(gcf);
         end
     end
-    function initGui(varargin) % initialize the recording gui
+    function initGui(varargin) % initialize the arlas graphical user interface
         obj = varargin{1};
         try % delete figure if it already exists
             delete(obj.H)
@@ -435,7 +444,7 @@ methods
     end
     
     % define the five main functions ------------------
-    function initPlayrec(varargin) % initialize playrec
+    function initPlayrec(varargin) % initialize playrec and arlas
         obj = varargin{1};
         try % if init tag is set to off (not available), return
             if strcmp(obj.h_init.Tag,'off') 
@@ -446,19 +455,25 @@ methods
             end
         catch
         end
-        try % set init button to on and other buttons to off
-            obj.buttonManager(20)
-            set(obj.VIEW,'Title','VIEW: Initialize')
-        catch
-        end
         try % get rid of any open figures from playrecARLas
             obj.objPlayrec.killPlots % if there are any open playrecARLas figures, make them disappear
-            delete(obj.objPlayrec) % delete any currently open playrecARLas objects
+        catch
+        end
+        try % delete any currently open playrecARLas objects
+            delete(obj.objPlayrec) 
         catch
         end            
         try % get rid of any open figures from initARLas
             obj.objInitARLas.killPlots
+        catch
+        end
+        try % delete any currently open initARLas objects
             delete(obj.objInitARLas);
+        catch
+        end
+        try % set init button to on and other buttons to off
+            obj.buttonManager(20)
+            set(obj.VIEW,'Title','VIEW: Initialize')
         catch
         end
         try % instantiate a new object of class initARLas
@@ -515,7 +530,7 @@ methods
             obj.printError(ME)            
         end
     end
-    function loadExperiment(varargin)
+    function loadExperiment(varargin) % select an experiment to run
         obj = varargin{1};
         try % if init tag is set to off (not available), return
             if strcmp(obj.h_init.Tag,'off') 
@@ -558,6 +573,28 @@ methods
             obj.printError(ME)
             return
         end
+        try % if there is more than one experiment file with the same name, alert user
+            if ~obj.expFileName  % if no experiment file was chosen or process was aborted
+                return
+            else % if an experiment file was chosen
+                dummy = which(obj.expFileName,'-ALL'); % get all instances of chosen file name
+                nFiles = length(dummy); % number of files with chosen name
+                if nFiles > 1
+                    warnTxt = {'  Issue: More than one experiment file with this name exists on the search path.'
+                         '  Action:  Highly reccommended that you remove duplicate files.'
+                         '  Location: arlas.load.'
+                        };
+                    warnMsgARLas(warnTxt);
+                    obj.h_load.TooltipString = ['LOADED EXPERIMENT: ',obj.expFileName];
+                    obj.buttonManager(41)
+                    for ii=1:nFiles
+                        disp(dummy(ii))
+                    end
+                else
+                end
+            end
+        catch
+        end
         try % set the tool-tip string
             if ~obj.expFileName  % if no experiment file was chosen or process was aborted
                 obj.h_load.TooltipString = 'LOAD experiment file';
@@ -572,7 +609,7 @@ methods
             else
                 obj.deadInTheWater = 1;
             end                                
-            errorTxt = {'  Issue: Unable to load experiment: Unexpeced error.'
+            errorTxt = {'  Issue: Unable to set tool-tip string.'
                  '  Action:  None.'
                  '  Location: arlas.load.'
                 };
@@ -685,13 +722,10 @@ methods
                 set(obj.VIEW,'Title','VIEW: ')
                 return
             end
-            try % try executing the experiment file
-                fh = str2func(obj.expFileName);
-                fh(obj);
-                obj.buttonManager(52) % successful completion
-                set(obj.VIEW,'Title','VIEW: ')
-            catch
-            end
+            fh = str2func(obj.expFileName); % create a function handle
+            fh(obj); % try executing the experiment file
+            obj.buttonManager(52) % successful completion
+            set(obj.VIEW,'Title','VIEW: ')
         catch ME
             obj.objPlayrec.killPlots % get rid of playrecARLas plots
             obj.killRun = 1;
@@ -705,21 +739,27 @@ methods
                      '  Action: Run stopped early.'
                      '  Location: in arlas.runExperiment.'
                     };
-                errorMsgARLas(errorTxt);
-                obj.buttonManager(51)
-                obj.printError(ME)
-                return
             else
                 errorTxt = {'  Issue: Error in experiment file.'
                      '  Action: Run stopped early.'
-                     '  Location: in currently loaded experiment file.'
-                     ['            ',obj.expFileName,'.m']
+                     ['  Location: ',obj.expFileName,'.m; Reported in arlas.runExperiment.']
                     };
-                errorMsgARLas(errorTxt);
-                obj.buttonManager(51)
-                obj.printError(ME)    
+                indx = [];
+                for ii=1:length(ME.stack)
+                    if strfind(obj.expFileName,ME.stack(ii).name) == 1
+                        indx = [indx;ii];
+                    end
+                end
+                if ~isempty(indx)
+                    me.identifier = ME.identifier;
+                    me.message = ME.message;
+                    me.stack = ME.stack(indx(1));
+                    ME = me;
+                end
             end
-            return
+            errorMsgARLas(errorTxt);
+            obj.buttonManager(51)
+            obj.printError(ME)
         end
     end
     function abortExperiment(varargin) % abort the currently-running experiment
@@ -739,9 +779,15 @@ methods
         catch
         end
         try % try and abort sequence
-            obj.objPlayrec.killRun = 1;
-            obj.killRun = 1;
-            pause(0.5)
+            try
+                obj.objPlayrec.killRun = 1;
+            catch
+            end
+            try
+                obj.killRun = 1;
+            catch
+            end
+            pause(0.01)
             try
                 playrec('delPage');
             catch
@@ -774,7 +820,10 @@ methods
     % functions that get and return values for use in experiment files --------
     function [samplingRate] = fs(varargin) % return the current sampling rate
         obj = varargin{1};
-        samplingRate = obj.objInit.fs_now;
+        try
+            samplingRate = obj.objInit.fs_now;
+        catch ME
+        end
     end
     function setRecList(varargin) % define the input channels to be used for recording
         % Usage: obj.setRecList(ch,label,micSens,gain); 
@@ -783,29 +832,39 @@ methods
         %     Label is a string for idenfification and file saving purposes
         %     Mic sens is in V/Pa. If no microphone is used, set = 1.
         %     Gain refers to hardware gain applied prior to ADC by the sound card. Specify in dB.        
-       obj = varargin{1};
-       if size(varargin,2) ~= 5
-            disp('Incorrect number of inputs')
-            return
-        end
-        ch = varargin{2}; % channel designation
-        ok = obj.checkInput_ch(ch);
-        if ~ok
-            return
-        end
-        label = varargin{3};
-        micSens = varargin{4};
-        ampGain = varargin{5};
-        maxGain = 200; % maximum gain allowed. This added as a caution to avoid gain entered in linear units
-        if ampGain > maxGain
-          errorTxt = {'  Issue: Gain exceeds maxGain of 200 dB.'
-                 '  Fix: Ensure gain is entered as a dB value, not as a linear value.'
-                 '  Location: in playrecARLas.setRecList.'
+        obj = varargin{1};
+        try % check for correct number, type, and value of inputs
+            if size(varargin,2) ~= 5
+                disp('Incorrect number of inputs')
+                return
+            end
+            ch = varargin{2}; % channel designation
+            ok = obj.checkInput_ch(ch);
+            if ~ok
+                return
+            end
+            label = varargin{3};
+            micSens = varargin{4};
+            ampGain = varargin{5};
+            maxGain = 200; % maximum gain allowed. This added as a caution to avoid gain entered in linear units
+            if ampGain > maxGain
+              errorTxt = {'  Issue: Gain exceeds maxGain of 200 dB.'
+                     '  Fix: Ensure gain is entered as a dB value, not as a linear value.'
+                     '  Location: in playrecARLas.setRecList.'
+                    };
+                errorMsgARLas(errorTxt);
+                return
+            end
+        catch ME
+            txt = 'problem with specified input arguments';
+            errorTxt = {['  Issue: Error specifying stimulus: ',txt]
+                 '  Action: None.'
+                 '  Location: in arlas.setRecList.'
                 };
             errorMsgARLas(errorTxt);
-            return
+            obj.printError(ME)            
         end
-        try
+        try % add new values to objPlayrec object
             indx = find(obj.objPlayrec.recChanList==ch); % check to see if chan already exists
             if isempty(indx)
                indx = length(obj.objPlayrec.recChanList) + 1;
@@ -814,13 +873,14 @@ methods
             obj.objPlayrec.micSens(1,indx) = micSens;
             obj.objPlayrec.ampGain(1,indx) = ampGain;
             obj.objPlayrec.label{1,indx} = label;
-        catch
-           txt = 'problem with specified channels';
-           errorTxt = {['  Issue: Error specifying stimulus: ',txt]
+        catch ME
+            txt = 'problem with specified channels';
+            errorTxt = {['  Issue: Error specifying stimulus: ',txt]
                  '  Action: None.'
-                 '  Location: in playrecARLas.setRecList.'
+                 '  Location: in arlas.setRecList.'
                 };
-            errorMsgARLas(errorTxt);                         
+            errorMsgARLas(errorTxt);
+            obj.printError(ME)            
         end        
     end
     function setPlayList(varargin) % define the output channels to be used for recording
@@ -1000,11 +1060,12 @@ methods
             error('setNReps must be given an input argument. Example: obj.setNReps(50);')
         end
         N = varargin{2};
-        if N < 2
-            error('number of repetitions mube be > 1')
+        if N < 1
+            error('number of repetitions mube be >= 1')
         end
         N = round(N); % force N to be an integer
-        obj.objPlayrec.nReps = N;
+        %obj.objPlayrec.nReps = N;
+        obj.objPlayrec.setNReps(N);
     end
     function [nReps] = getNReps(varargin) % get the number of playback/record repetitions
         obj = varargin{1};
@@ -1195,23 +1256,28 @@ methods
         ok = 1;
         obj = varargin{1};
         ch = varargin{2};
-        if ~isa(ch,'numeric')
+        if sum(size(ch)) ~= 2 & ok == 1
+            ok = 0;
+            txt = 'Channel must be a scalar value; not vector or matrix.';
+        end
+        if ~isa(ch,'numeric') & ok == 1
             ok = 0;
             txt = 'Channel must be data type numeric.';
         end
-        if mod(ch,1)~= 0
+        if mod(ch,1)~= 0 & ok == 1
             ok = 0;
             txt = 'Channel must be an integer.';
         end
-        if ch < 1
+        if ch < 1 & ok == 1
             ok = 0;
             txt = 'Channel must be >= 1.';
         end
-        if ch > obj.objInit.chans_out
+        if ch > obj.objInit.chans_out & ok == 1
             ok = 0;
             txt = 'Channel must be <= to max number of initialized channels';
         end
         if ~ok
+            obj.deadInTheWater = 1;
             errorTxt = {['  Issue: Error specifying channel: ',txt]
                  '  Action: None.'
                  '  Location: in playrecARLas.checkInput_ch.'
@@ -1220,8 +1286,17 @@ methods
         end
     end
     function [ok] = checkForErrors(varargin) % check to see if experiment should continue or stop due to errors
-         obj = varargin{1};
-        ok = ~obj.objPlayrec.killRun;
+        obj = varargin{1};
+        %ok = ~obj.objPlayrec.killRun; % old way; do not use!
+        ok = obj.killRun;
+        errorTxt = {'  Issue: the arlas method obj.checkForErrors is no longer supported.'
+                 '  Action: Replace with the following lines:'
+                 '          if obj.killRun'
+                 '              return'
+                 '          end'
+                };
+        errorMsgARLas(errorTxt);
+        obj.buttonManager(51)
     end
 end
 end

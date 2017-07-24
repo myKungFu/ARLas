@@ -8,11 +8,11 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: July 20, 2017
+% Last Updated: July 24, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.20';
+    arlasVersion = '2017.07.24';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -59,6 +59,7 @@ properties (SetAccess = private)
     skippedPages        % skipped page files
     failedRun           % determines whether page files have run out
     deadInTheWater      % detemines whether error already occured and whether to print error msg
+    nReps               % number of stimulus repetitions to play/record    
 end
 properties (SetAccess = public) 
     fs                  % sample rate
@@ -83,7 +84,7 @@ properties (SetAccess = public)
     chans_in_now        % list of currently used channels (without Ch0 initialization)
     nChans_in_now       % number of currently used input channels
     
-    nReps               % number of stimulus repetitions to play/record
+    %nReps               % number of stimulus repetitions to play/record
     xStart              % sets the start of xlim for viewing the time plots
     xFinish             % sets the end of xlim for viewing the time plots
     
@@ -607,8 +608,8 @@ methods
     function queue(varargin) % load the queue and start it running
         objPlayrec = varargin{1};
         try % perform initial basic stimulus error checking
-            if objPlayrec.nReps < 2 % number of reps must be 2 or more
-                errorTxt = {'  Issue: nReps must be >= 2.'
+            if objPlayrec.nReps < 1 % number of reps must be 1 or more
+                errorTxt = {'  Issue: nReps must be >= 1.'
                      '  Fix: In experiment file, make nReps >=2 and re-run.'
                      '  Location: in playrecARLas.queue.'
                     };
@@ -662,12 +663,12 @@ methods
         end
         try % re-initialize playrec, get current system latencies
             if playrec('isInitialised')
-                playrec('reset')
+                playrec('reset');
             end
-            playrec('init',objPlayrec.fs,objPlayrec.id_out,objPlayrec.id_in)
+            playrec('init',objPlayrec.fs,objPlayrec.id_out,objPlayrec.id_in);
             [playLatency,playSuggestedLatency] = playrec('getPlayLatency');
             [recLatency,recSuggestedLatency] = playrec('getRecLatency');
-            playrec('reset')
+            playrec('reset');
             fs = objPlayrec.fs; % sample rate
             pd = objPlayrec.id_out; % play device
             rd = objPlayrec.id_in; % rec device
@@ -687,17 +688,28 @@ methods
             if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
                 objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
             else
-                disp(' ')
-                disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
-                disp('       Using measured delay, not playrec estimated delay.')
-                disp(' ')
+                if objPlayrec.systemDelay ~= 0
+                    disp(' ')
+                    disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
+                    disp('       Using measured delay, not playrec estimated delay.')
+                    disp(' ')
+                end
             end
-            playrec('init',fs,pd,rd,pmc,rmc,fpb,psl,rsl)
+            playrec('init',fs,pd,rd,pmc,rmc,fpb,psl,rsl);
             pause(.001)
             objPlayrec.writePauseLen = (objPlayrec.nSamples / objPlayrec.fs) * 0.5; % estimate delay between each check for completed buffers
-            NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Will load twice what was asked for, and then abort when done.
-            objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
-            objPlayrec.plotDelay = mod(objPlayrec.systemDelay,objPlayrec.nSamples); % how much delay (based on system delay) to account for when plotting
+            if objPlayrec.nReps == 1
+                NN = 1;
+            else
+                NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Will load twice what was asked for, and then abort when done.
+            end
+            if objPlayrec.nReps > 1
+                objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
+                objPlayrec.plotDelay = mod(objPlayrec.systemDelay,objPlayrec.nSamples); % how much delay (based on system delay) to account for when plotting
+            else
+                objPlayrec.extraBuffers = 0;
+                objPlayrec.plotDelay = 0;
+            end
         catch ME
             if objPlayrec.deadInTheWater == 1
                 return
@@ -769,7 +781,7 @@ methods
                 isdone(ii,1) = playrec('isFinished',objPlayrec.pageFiles(ii));
             end
             if objPlayrec.mu == 0  % if this is the first recorded buffer set
-                if sum(isdone) < 2 % if there are less than 2 buffers
+                if sum(isdone) < 2 && objPlayrec.nReps > 1 % if there are less than 2 buffers
                     return         % wait until there are at least 2 buffers
                 end
             end
@@ -785,14 +797,16 @@ methods
                 objPlayrec.objInit.obj.buttonManager(51)
             end
             skipped = playrec('getSkippedSampleCount'); % check to see if any "glitches" have occurred (according to playrec)
-            if skipped ~= 0 % if glitches have occurred
-                objPlayrec.skippedPages = [objPlayrec.skippedPages;skipped]; % keep track of skipped samples
-                playrec('resetSkippedSampleCount') % reset counter to zero
-                for ii=1:objPlayrec.completedPageFiles % the current set of files have a glitch, so delete them
-                    playrec('delPage',objPlayrec.pageFiles(1)); % clear the current pageFiles
-                    objPlayrec.pageFiles(1) = []; % delete finished pageFiles
+            if objPlayrec.nReps > 1
+                if skipped ~= 0 % if glitches have occurred
+                    objPlayrec.skippedPages = [objPlayrec.skippedPages;skipped]; % keep track of skipped samples
+                    playrec('resetSkippedSampleCount'); % reset counter to zero
+                    for ii=1:objPlayrec.completedPageFiles % the current set of files have a glitch, so delete them
+                        playrec('delPage',objPlayrec.pageFiles(1)); % clear the current pageFiles
+                        objPlayrec.pageFiles(1) = []; % delete finished pageFiles
+                    end
+                    return
                 end
-                return
             end
         catch ME
             if objPlayrec.deadInTheWater == 1
@@ -1037,27 +1051,29 @@ methods
                 end
                 expectedLength = (objPlayrec.completedBuffers) * objPlayrec.nSamples; % number of samples to read in
                 X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
-                X = X(objPlayrec.systemDelay+1:end); % cut off the leading system delay
-                X = X(1:end-mod(length(X),objPlayrec.nSamples)); % cut off the resulting trailing edge
-                expectedLength = objPlayrec.nReps * objPlayrec.nSamples; % number of samples after shifting to fix system delay
-                actualLength = floor(length(X)/objPlayrec.nSamples) * objPlayrec.nSamples; % actual length may be different if aborted
-                if actualLength < expectedLength % the case when run aborted early
-                    X = X(1:actualLength); % include only the desired number of samples (discard any extras, if they exist)
-                    warnTxt = {['  Issue: Run aborted. ',num2str(floor(length(X)/objPlayrec.nSamples)),' of ',num2str(objPlayrec.nReps),' reps saved.']
-                         '  Action: None.'
-                         '  Location: in playrecARLas.retrieveData.'
-                        };
-                    warnMsgARLas(warnTxt);
-                    objPlayrec.objInit.obj.buttonManager(51)
-                    objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
-                else
-                    X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
+                if objPlayrec.nReps > 1
+                    X = X(objPlayrec.systemDelay+1:end); % cut off the leading system delay
+                    X = X(1:end-mod(length(X),objPlayrec.nSamples)); % cut off the resulting trailing edge
+                    expectedLength = objPlayrec.nReps * objPlayrec.nSamples; % number of samples after shifting to fix system delay
+                    actualLength = floor(length(X)/objPlayrec.nSamples) * objPlayrec.nSamples; % actual length may be different if aborted
+                    if actualLength < expectedLength % the case when run aborted early
+                        X = X(1:actualLength); % include only the desired number of samples (discard any extras, if they exist)
+                        warnTxt = {['  Issue: Run aborted. ',num2str(floor(length(X)/objPlayrec.nSamples)),' of ',num2str(objPlayrec.nReps),' reps saved.']
+                             '  Action: None.'
+                             '  Location: in playrecARLas.retrieveData.'
+                            };
+                        warnMsgARLas(warnTxt);
+                        objPlayrec.objInit.obj.buttonManager(51)
+                        objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
+                    else
+                        X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
+                    end
                 end
                 objPlayrec.Data(:,ii) = X; % pass the recorded data to arlas
                 if ~isempty(objPlayrec.skippedPages)
                     if length(objPlayrec.skippedPages) > 1
                         warnTxt = {'  Issue: Page files were skipped!.'
-                             ['  ',num2str(length(objPlayrec.skippedPages)),' pages were idenfified and discarded.']
+                             ['  ',num2str(length(objPlayrec.skippedPages)),' pages were identified and discarded.']
                              '  Action: None.'
                              '  Location: in playrecARLas.retrieveData.'
                             };
@@ -1166,6 +1182,9 @@ methods
                 data = objPlayrec.Data(:,ii); % each column is one channel
                 % reshape into a matrix, with buffers in a column
                 nSamples = length(data) / objPlayrec.nReps;
+                if isnan(nSamples) % if no data were actually read in
+                    return
+                end
                 if mod(nSamples,1) ~= 0 % if nSamples is a non-integer
                     nSamples = floor(nSamples); % round down
                     data = data(1:nSamples * objPlayrec.nReps); % cut to proper length
@@ -1507,5 +1526,18 @@ methods
             objPlayrec.printError(ME)                
         end
     end
+    function setNReps(varargin) % set the number of playback/record repetitions
+        objPlayrec = varargin{1};
+        if nargin < 2
+            error('setNReps must be given an input argument. Example: obj.setNReps(50);')
+        end
+        N = varargin{2};
+        if N < 1
+            error('number of repetitions mube be >= 1')
+        end
+        N = round(N); % force N to be an integer
+        objPlayrec.nReps = N;
+    end    
+    
 end
 end

@@ -8,11 +8,11 @@ classdef initARLas < handle
 % The University of Iowas
 % Author: Shawn S. Goodman, PhD
 % Date: August 26, 2016
-% Last Updated: July 20, 2017
+% Last Updated: July 24, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.20';
+    arlasVersion = '2017.07.24';
     obj         % passed from arlas
     initPath    % passed from arlas
     initFile    % passed from arlas
@@ -278,16 +278,15 @@ methods
         end
     end
     function killPlots(varargin)
-        %objInit = varargin{1};
         try
             a = findall(gcf);
             counter = 1;
             for ii=1:size(a,1)
                 try
-                if strcmp(a(ii).Parent.Title,'VIEW: Initialize')
-                    indx(counter,1) = ii;
-                    counter = counter + 1;
-                end
+                    if strcmp(a(ii).Parent.Title,'VIEW: Initialize')
+                        indx(counter,1) = ii;
+                        counter = counter + 1;
+                    end
                 catch
                 end
             end
@@ -472,15 +471,24 @@ methods
         end
     end
     function samplingManager(varargin) % manage selection of Sampling Rate
-        % check to see if selected sampling rate works
         objInit = varargin{1}; % get the object
-        try
+        try         % check to see if selected sampling rate works
             objInit.fs_now = objInit.fs(get(objInit.SAMPLING,'value')); % get the current sampling rate value
             if playrec('isInitialised')
                 playrec('reset')
             end
             try % try initializing with current values
-                playrec('init',objInit.fs_now,objInit.id_out_now,objInit.id_in_now)
+                try
+                    playrec('init',objInit.fs_now,objInit.id_out_now,objInit.id_in_now);
+                catch ME
+                    if isempty(strfind(ME.message,'Invalid sample rate')) % if the error is not due to a sampling rate incompatibility
+                        try
+                            clear mex % try clearing out arlas and re-initializing
+                            playrec('init',objInit.fs_now,objInit.id_out_now,objInit.id_in_now);
+                        catch ME
+                        end
+                    end
+                end
                 pause(.01)
                 playrec('reset')
                 pause(.01)
@@ -489,7 +497,7 @@ methods
                 set(objInit.ID_in,'BackgroundColor',[1 1 1])
             catch ME
                errorTxt = {'  Issue: selected sampling rate is not compatible with the other selections.'
-                     '  Suggested Action: Unknown.'
+                     '  Suggested Action: Choose a different sampling rate or choose a different device.'
                      '  Location: initARLas.samplingManager.'
                     };
                 warnMsgARLas(errorTxt);
@@ -533,7 +541,7 @@ methods
             objInit.ID_out.Value = value;       
             set(objInit.NAME_out,'String',objInit.name_out_now);
             set(objInit.CHANS_out,'String',num2str(objInit.chans_out))
-            objInit.initChannels % initialize channel values
+            %objInit.initChannels % initialize channel values
             objInit.samplingManager
         catch ME
             errorTxt = {'  Issue: Unexpected error selecting Input Device ID.'
@@ -547,33 +555,43 @@ methods
     end
     function outputIdManager(varargin) % manage Device ID for output
         objInit = varargin{1}; % get the object
-        try
-            value = varargin{2}.Value; % get the index value from the popup menu
-        catch
-            value = 1; % if none found, default to 1
+        try 
+            try
+                value = varargin{2}.Value; % get the index value from the popup menu
+            catch
+                value = 1; % if none found, default to 1
+            end
+            objInit.indx_out_now = objInit.deviceIndx_out(value); 
+            objInit.id_out_now = objInit.devs(objInit.indx_out_now).deviceID;
+            objInit.name_out_now = objInit.devs(objInit.indx_out_now).name;
+            objInit.chans_out = objInit.devs(objInit.indx_out_now).outputChans; 
+            %objInit.chans_out_now = objInit.chans_out;
+            objInit.ID_out.Value = value;
+            set(objInit.NAME_out,'String',objInit.name_out_now);
+            set(objInit.CHANS_out,'String',num2str(objInit.chans_out))
+            % also change input channel to match
+            objInit.indx_in_now = objInit.deviceIndx_in(value); 
+            objInit.id_in_now = objInit.devs(objInit.indx_in_now).deviceID;
+            objInit.name_in_now = objInit.devs(objInit.indx_in_now).name;
+            objInit.chans_in = objInit.devs(objInit.indx_in_now).inputChans;
+            %objInit.chans_in_now = objInit.chans_in;
+            objInit.ID_in.Value = value;     
+            set(objInit.NAME_in,'String',objInit.name_in_now);
+            set(objInit.CHANS_in,'String',num2str(objInit.chans_in))
+            objInit.fs_now = objInit.devs(objInit.indx_out_now).defaultSampleRate;
+            [~,value] = min(abs(objInit.fs_now-objInit.fs));
+            set(objInit.SAMPLING,'Value',value)
+            %objInit.initChannels % initialize channel values
+            objInit.samplingManager
+        catch ME
+            errorTxt = {'  Issue: Unexpected error selecting Output Device ID.'
+                 '  Action: None.'
+                 '  Location: initARLas.outputIdManager.'
+                };
+            errorMsgARLas(errorTxt);
+            objInit.obj.buttonManager(21)
+            objInit.printError(ME)
         end
-        objInit.indx_out_now = objInit.deviceIndx_out(value); 
-        objInit.id_out_now = objInit.devs(objInit.indx_out_now).deviceID;
-        objInit.name_out_now = objInit.devs(objInit.indx_out_now).name;
-        objInit.chans_out = objInit.devs(objInit.indx_out_now).outputChans; 
-        %objInit.chans_out_now = objInit.chans_out;
-        objInit.ID_out.Value = value;
-        set(objInit.NAME_out,'String',objInit.name_out_now);
-        set(objInit.CHANS_out,'String',num2str(objInit.chans_out))
-        % also change input channel to match
-        objInit.indx_in_now = objInit.deviceIndx_in(value); 
-        objInit.id_in_now = objInit.devs(objInit.indx_in_now).deviceID;
-        objInit.name_in_now = objInit.devs(objInit.indx_in_now).name;
-        objInit.chans_in = objInit.devs(objInit.indx_in_now).inputChans;
-        %objInit.chans_in_now = objInit.chans_in;
-        objInit.ID_in.Value = value;     
-        set(objInit.NAME_in,'String',objInit.name_in_now);
-        set(objInit.CHANS_in,'String',num2str(objInit.chans_in))
-        objInit.fs_now = objInit.devs(objInit.indx_out_now).defaultSampleRate;
-        [~,value] = min(abs(objInit.fs_now-objInit.fs));
-        set(objInit.SAMPLING,'Value',value)
-        objInit.initChannels % initialize channel values
-        objInit.samplingManager
     end
     
     function delayManager(varargin) % manage setting of system delay
