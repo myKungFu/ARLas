@@ -1086,6 +1086,10 @@ methods
             error('Input to setFilter must be 0 (off) or 1 (on).')
         end
     end
+    function run(varargin) % run arlasPlayrec (collecte dataO
+        obj = varargin{1};
+        obj.objPlayrec.run;
+    end
     function [toggle] = getFilter(varargin) % turn on/off the HP IIR filter
         obj = varargin{1};
         toggle = obj.objPlayrec.doFilter;
