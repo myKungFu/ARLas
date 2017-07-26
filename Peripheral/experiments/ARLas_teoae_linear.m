@@ -78,7 +78,7 @@ obj.objPlayrec.userInfo.fs = fs;
 % PLAYBACK & RECORD ----------------------------------------------------
 obj.setFilter(1); % filter is on (set to 0 if want no filtering)
 obj.setNReps(nReps); % number of times to play stimulus
-obj.objPlayrec.run % run the stimulus
+obj.run % run the stimulus
 if obj.killRun
    return
 end
