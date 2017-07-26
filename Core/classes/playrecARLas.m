@@ -12,7 +12,7 @@ classdef playrecARLas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.24';
+    arlasVersion = '2017.07.26';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -165,6 +165,7 @@ methods
     function initDataPlot(varargin) % create plots associated with playrecARLas
         objPlayrec = varargin{1};
         try
+            figure(objPlayrec.H)
             set(objPlayrec.VIEW,'Title','VIEW: Playrec')
             % create panel ----- % create panels within figure ([left, bottom,width, height])
             objPlayrec.WAVEFORM = uipanel('Parent',objPlayrec.objInit.VIEW,...
@@ -180,11 +181,13 @@ methods
             % create plots -----
             objPlayrec.h_current = axes('Parent',objPlayrec.WAVEFORM,'Visible','on','Color',[1 1 1],...
                 'Units','Normalized','Position',[.125 .6 .85 .35],'XTick',[]);
-            %axes(objPlayrec.h_current)
+            axes(objPlayrec.h_current)
+            %pause(.0001) % !!
             ylabel('Amplitude (mPa)','FontSize',12);
             objPlayrec.h_average = axes('Parent',objPlayrec.WAVEFORM,'Visible','on','Color',[1 1 1],...
                 'Units','Normalized','Position',[.125 .145 .85 .35]); % [.125 .125 .85 .35]
-            %axes(objPlayrec.h_average)
+            pause(.001)
+            axes(objPlayrec.h_average)
             xlabel('Time (ms)','FontSize',12);
             ylabel('Amplitude (mPa)','FontSize',12);
             % [left,bottom,width,height]       

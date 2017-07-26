@@ -97,5 +97,13 @@ function [] = ARLasVersionInfo()
 %       changes made to improve stability. This version suppresses multiple 
 %       error messages, hopefully enabling easier debugging.
 %
+% 2017.07.26
+%   Fixed a plotting glitch that was overwriteing axis labels on other open
+%       figures. This was occurring in playrecARLas when new plots were
+%       made for the waveforms. There is now a visible, short, delay;
+%       however, this is preferable to overwritting other figure axis
+%       labels.
+%
+
 
 

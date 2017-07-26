@@ -12,7 +12,7 @@ classdef arlas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.24';
+    arlasVersion = '2017.07.26';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
