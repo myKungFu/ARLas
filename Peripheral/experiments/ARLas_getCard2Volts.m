@@ -10,7 +10,9 @@ function [] = ARLas_getCard2Volts(varargin)
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: January 9, 2017
-% Last Updated: January 9, 2017
+% Updated: January 9, 2017
+% Updated: August 15, 2017  Updated a few lines to make compatible with
+%                           current ARLas version
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %--------------------- SET THESE VALUE BEFORE RUNNING! --------------------
@@ -60,16 +62,15 @@ gain = 0;
 obj.setRecList(inputChannel,label,micSens,gain);
 
 
-obj.objPlayrec.nReps = 10; % number of times to play stimulus
+obj.setNReps(10); % number of times to play stimulus
 objInit.card2volts_now = 1; % set to 1 in order to measure
 obj.objPlayrec.card2volts = 1; % set to 1 in order to measure
 
 % 3) PLAYBACK & RECORD ----------------------------------------------------
 obj.objPlayrec.run % run the stimulus
-ok = obj.checkForErrors;
-if ~ok
+if obj.killRun
    return
-end
+end    
 
 prompt = {'Enter the measured voltage (in Volts): '};
 title = 'Open Circuit Voltage'; 
