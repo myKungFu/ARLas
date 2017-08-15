@@ -10,7 +10,9 @@ function [] = ARLas_cavityRecordings(varargin)
 % Author: Shawn Goodman
 % Date: June 29, 2015;
 % Updated: January 31, 2017
-% Last Updated: May 8, 2017 % expanded bandpass filter highcut frequency
+% Last Updated: May 8, 2017 Expanded bandpass filter highcut frequency
+% Updated: August 15, 2017  Changed a few lines for compatibility with
+%                           current version of ARLas
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 obj = varargin{1};
 
@@ -52,17 +54,16 @@ for jj=1:nCavities % loop over number of cavities
         obj.setRecList(input.ch,input.label,input.micSens,input.gain); % load the recording info for ARLas to use
         obj.clearPlayList % clear the previously used playback list
         obj.setPlayList(stimulus,output.ch(kk)); % load the currently tested output channel
-        obj.objPlayrec.nReps = 128; % number of times to play stimulus
+        objsetNReps(128); % number of times to play stimulus
 
         % PLAYBACK & RECORD ----------------------------------------------------
         obj.objPlayrec.run % run the stimulus
-        ok = obj.checkForErrors;
-        if ~ok
+        if obj.killRun
            return
-        end   
+        end    
         
         % RETRIEVE DATA ----------------------------------------------------
-        [header,data] = obj.retrieveData('Ch1'); % get raw data
+        [header,data] = obj.retrieveData(output.label); % get raw data
             
         channel = kk; % which channel to retrieve data from
         if kk == 1

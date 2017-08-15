@@ -9,10 +9,10 @@ function [] = ARLas_getDelay(varargin)
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: January 9, 2017
-% Last Updated: July 20, 2017
+% Last Updated: August 15, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%--------------------- SET THESE VALUE BEFORE RUNNING! --------------------
+%--------------------- SET THESE VALUES BEFORE RUNNING! --------------------
 outputChannel = 1;
 inputChannel = 1;
 % Make a direct electrical connnection between these two channels.
@@ -56,7 +56,7 @@ gain = 0;
 obj.setRecList(inputChannel,label,micSens,gain);
 
 
-obj.objPlayrec.nReps = 10; % number of times to play stimulus
+obj.setNReps(10); % number of times to play stimulus
 obj.objInit.delay_now = 0; % set to zero in order to measure
 obj.objPlayrec.systemDelay = 0; % set to zero in order to measure
 
