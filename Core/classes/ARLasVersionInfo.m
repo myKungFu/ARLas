@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: July 24, 2017
+% Last Updated: August 14, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -104,6 +104,15 @@ function [] = ARLasVersionInfo()
 %       however, this is preferable to overwritting other figure axis
 %       labels.
 %
-
+% 2017.08.11
+%   Added a helpful error message to users regarding the old (no longer
+%       supported) syntax for setting nReps. New message prints the fix on the
+%       screen to help users update their code.
+%
+% 2017.08.14
+%   Turned off one of the features implemented on 2017.07.20. No longer
+%       uses playrec's system delay estimate. Found it was not providing
+%       benefit on windows systems, and was causing problems on Mac.
+%
 
 

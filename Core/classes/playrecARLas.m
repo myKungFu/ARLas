@@ -8,11 +8,11 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: July 24, 2017
+% Last Updated: August 14, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.26';
+    arlasVersion = '2017.08.14';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -59,7 +59,8 @@ properties (SetAccess = private)
     skippedPages        % skipped page files
     failedRun           % determines whether page files have run out
     deadInTheWater      % detemines whether error already occured and whether to print error msg
-    nReps               % number of stimulus repetitions to play/record    
+    nReps               % number of stimulus repetitions to play/record
+    usePlayrecDelay     % whether or not to use playrec's calculated delay (1) or the user's measured delay (0)
 end
 properties (SetAccess = public) 
     fs                  % sample rate
@@ -128,11 +129,13 @@ methods
             objPlayrec.VIEW = objInit.VIEW; % pass handle to view panel of main gui
             objPlayrec.indx_in_now = 1; % set default view to first item in recChanList
             objPlayrec.completedBuffers = 0;
-            objPlayrec.nReps = 0;
+            %objPlayrec.nReps = 0;
+            objPlayrec.nReps = ([{0},{'ok'}]);
             objPlayrec.setFilter % load the filters in case they need to be used
             objPlayrec.doFilter = 1; % default is to turn on filtering
             objPlayrec.failedRun = 0;
             objPlayrec.deadInTheWater = 0;
+            objPlayrec.usePlayrecDelay = 0;
         catch ME
             errorTxt = {'  Issue: Unexpected error creating object of class playrecARLas.'
                  '  Action: None.'
@@ -680,22 +683,22 @@ methods
             fpb = 0; % frames per buffer
             psl = playSuggestedLatency; % play suggested latency
             rsl = recSuggestedLatency; % rec suggested latency
-                %objPlayrec.systemDelay = round(fs*playLatency); % note: this
-                %was coming up too short; use the following command instead
-            preferredDelay = round(fs*(recSuggestedLatency + playSuggestedLatency)); % system delay according to playrec
-            if preferredDelay > objPlayrec.systemDelay
-                ratio = objPlayrec.systemDelay / preferredDelay;
-            else
-                ratio = preferredDelay / objPlayrec.systemDelay;
-            end
-            if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
-                objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
-            else
-                if objPlayrec.systemDelay ~= 0
-                    disp(' ')
-                    disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
-                    disp('       Using measured delay, not playrec estimated delay.')
-                    disp(' ')
+            if objPlayrec.usePlayrecDelay == 1
+                preferredDelay = round(fs*(recSuggestedLatency + playSuggestedLatency)); % system delay according to playrec
+                if preferredDelay > objPlayrec.systemDelay
+                    ratio = objPlayrec.systemDelay / preferredDelay;
+                else
+                    ratio = preferredDelay / objPlayrec.systemDelay;
+                end
+                if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
+                    objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
+                else
+                    if objPlayrec.systemDelay ~= 0
+                        disp(' ')
+                        disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
+                        disp('       Using measured delay, not playrec estimated delay.')
+                        disp(' ')
+                    end
                 end
             end
             playrec('init',fs,pd,rd,pmc,rmc,fpb,psl,rsl);
@@ -1067,7 +1070,8 @@ methods
                             };
                         warnMsgARLas(warnTxt);
                         objPlayrec.objInit.obj.buttonManager(51)
-                        objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
+                        %objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
+                        objPlayrec.nReps = ([{floor(length(X)/objPlayrec.nSamples)},{'ok'}]); % update nReps to reflect actual number recorded
                     else
                         X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
                     end
@@ -1539,8 +1543,26 @@ methods
             error('number of repetitions mube be >= 1')
         end
         N = round(N); % force N to be an integer
-        objPlayrec.nReps = N;
-    end    
-    
+        %objPlayrec.nReps = N;
+        objPlayrec.nReps = ([{N},{'ok'}]);
+    end
+    function objPlayrec = set.nReps(objPlayrec,dummy)
+        %objPlayrec = varargin{1};
+        %dummy = varargin{2};
+        if size(dummy,2) ~= 2
+            objPlayrec.objInit.obj.killRun;
+            errorTxt = {'  Issue: the sytax "obj.objPlayrec.nReps = nReps;" is no longer supported.'
+                     '  Action: Replace with the following line:'
+                     '          obj.setNReps(nReps);'
+                    };
+            errorMsgARLas(errorTxt);
+            objPlayrec.objInit.obj.buttonManager(51)        
+        else
+           if strcmp(dummy{2},'ok')== 1
+               N = dummy{1};
+               objPlayrec.nReps = N; 
+           end
+        end
+    end
 end
 end

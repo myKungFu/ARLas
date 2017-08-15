@@ -12,7 +12,7 @@ classdef arlas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.07.26';
+    arlasVersion = '2017.08.14';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -1071,6 +1071,7 @@ methods
         end
         N = round(N); % force N to be an integer
         %obj.objPlayrec.nReps = N;
+        %obj.objPlayrec.setNReps({N},{'ok'});
         obj.objPlayrec.setNReps(N);
     end
     function [nReps] = getNReps(varargin) % get the number of playback/record repetitions
