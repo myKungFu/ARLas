@@ -13,6 +13,11 @@ function [] = ARLas_getCard2Volts(varargin)
 % Updated: January 9, 2017
 % Updated: August 15, 2017  Updated a few lines to make compatible with
 %                           current ARLas version
+% Updated: August 24, 2017  Fixed a couple more bugs: Changed tone
+%                           frequency to 250 Hz (was 100) so below cutoff of filter (125 Hz);
+%                           Also, turned filter off for good measure; not
+%                           need for a direct in/out electrical connection
+%                           anyway.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %--------------------- SET THESE VALUE BEFORE RUNNING! --------------------
@@ -26,18 +31,19 @@ obj = varargin{1}; % get the arlas object
 
 % 1) CREATE THE STIMULUS --------------------------------------------------
 fs = obj.fs; % get the system sampling rate
-len = 0.5; % desired stimulus length (s)
+len = 1; % desired stimulus length (s)
+nReps = 10; % number of stimulus repetitions
     nSamples = round(len * fs); % number of samples in stimulus
     if mod(nSamples,2) ~= 0 % force to be even number
         nSamples = nSamples + 1;
     end
 t = (0:1:nSamples-1)'/obj.fs; % time in seconds
-f = 100; % frequency in Hz
+f = 250; % frequency in Hz
 a = .5; % amplitude (full out is 1)
 stimulus = a * cos(2*pi*f*t);
             
 txt = ({'This routine will calculate a multiplier to convert card units to voltage.';'';...
-            ['A 100 Hz pure tone will be played through Output Channel ',num2str(outputChannel),'.'];'';...
+            ['A 250 Hz pure tone will be played through Output Channel ',num2str(outputChannel),'.'];'';...
             'The tone will be played for 10 seconds.';'';...
             'Use a voltmeter to measure the open circuit AC voltage of the channel.';'';...
             'Write this value down. You will enter it in the next step.'});
@@ -51,9 +57,13 @@ else % if user shut down box using the x
 end
 
 % 2) LOAD THE STIMULUS ----------------------------------------------------
+obj.clearRecList % clear out whatever was used previously 
+obj.clearPlayList % clear out whatever was used previously
 
 % Load Output:
 obj.setPlayList(stimulus,outputChannel);
+obj.setNReps(nReps); % number of times to play stimulus
+obj.setFilter(1);
 
 % Load Input:
 label = 'noInput';
@@ -61,8 +71,6 @@ micSens = 1;
 gain = 0;
 obj.setRecList(inputChannel,label,micSens,gain);
 
-
-obj.setNReps(10); % number of times to play stimulus
 objInit.card2volts_now = 1; % set to 1 in order to measure
 obj.objPlayrec.card2volts = 1; % set to 1 in order to measure
 
@@ -82,15 +90,7 @@ elseif strcmp(answer{1},'') % if user left field blank
 else % user put something in the field
     openCircuitVoltage = abs(str2num(answer{1})); % voltage rms must be positive 
 end
-% if isempty(openCircuitVoltage) % but that something was not numeric
-%     errorTxt = {'  Issue: Illegal input for voltage; possibly non-numeric value.'
-%          '  Action: getCard2V terminated prematurely.'
-%          '  Location: initARLas.getCard2V.'
-%         };
-%     errorMsgARLas(errorTxt);
-%     objInit.obj.buttonManager(21)
-%     return
-% end
+
 txt = ({['Connect Output Channel ',num2str(outputChannel),' directly to Input Channel ',num2str(inputChannel),'.'];'';...
         'A 10-second, 100 Hz pure tone will again be played.';''});
 choice = questdlg(txt,'Get Card to Volts','Continue','Cancel','Continue');
@@ -103,10 +103,9 @@ else % if user shut down box using the x
 end
 
 obj.objPlayrec.run % run the stimulus
-ok = obj.checkForErrors;
-if ~ok
+if obj.killRun
    return
-end
+end    
 
 % 4) RETRIEVE DATA ----------------------------------------------------
 [header1,data1] = obj.retrieveData(['Ch',num2str(inputChannel)]);
@@ -125,3 +124,14 @@ txt = ({['Your calculated Card to Volts is ',num2str(cardMultiplier),'.'];'';...
 choice = msgbox(txt,'Get Card to Volts');
             
 end % end of experiment file
+
+% OLD CODE
+% if isempty(openCircuitVoltage) % but that something was not numeric
+%     errorTxt = {'  Issue: Illegal input for voltage; possibly non-numeric value.'
+%          '  Action: getCard2V terminated prematurely.'
+%          '  Location: initARLas.getCard2V.'
+%         };
+%     errorMsgARLas(errorTxt);
+%     objInit.obj.buttonManager(21)
+%     return
+% end
