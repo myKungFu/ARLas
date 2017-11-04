@@ -8,6 +8,7 @@ function [epsilon] = findOptimalLengths1(cavityLengths)
 % The University of Iowa
 % Author: Shawn Goodman
 % Date: July 21, 2015
+% Updated: November 4, 2017 - ssg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 sep = filesep;
@@ -17,11 +18,17 @@ obj = q.obj;
 ZLi = calculate_ZLi(cavityLengths,obj);
 [PS,ZS] = calculate_source(ZLi,obj);
 epsilon = calculate_error(ZLi,PS,ZS,obj);
+% figure(113)
+% plot(epsilon,'*')
+% hold on
+% pause(.01)
 
 % subfunctions ------------------------------------------------------------
 function [ZLi] = calculate_ZLi(cavityLengths,obj)
 % calculate theoretical cavity impedance
 R = exp(-2 * obj.wn * cavityLengths'); % wave equation exponent.  Volume velocity is 0 at the closed end of the tube.
+%R = exp(-2 * obj.wn * cavityLengths(:)); 
+
 % zc = z0 .* (1 + R) ./ (1 - R); % ideal cavity impedance; Alternative notation: Zc = -iZo*cot(kL), where k = wavenumber
 % this formulation of zc assumes perfectly reflective cavities, which
 % is not the case with real tubes. Reducing R in the numerator reduces

@@ -8,13 +8,16 @@ function [epsilon] = findOptimalLengths2(cavityLengths)
 % The University of Iowa
 % Author: Shawn Goodman
 % Date: July 21, 2015
+% Updated: Jun2 13, 2017 - ssg; forced cavity lengths to be column vector
+%                               on line 19
+% Updated: November 4, 2017 - ssg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 sep = filesep;
 q = load(['C:',sep,'myWork',sep,'ARLas',sep,'temp.mat']);
 obj = q.obj;
 
-ZLi = calculate_ZLi(cavityLengths,obj);
+ZLi = calculate_ZLi(cavityLengths(:),obj);
 [PS,ZS] = calculate_source(ZLi,obj);
 ZL = calculate_ZL(PS,ZS,obj);
 epsilon = calculate_error(ZL,ZLi,obj);
