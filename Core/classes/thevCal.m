@@ -68,6 +68,8 @@ classdef thevCal < handle
 % Updated: September 2, 2015 - ssg
 % Updated: October 31, 2016 - ssg
 % Updated: June 13, 2017 - ssg for use with er10x; see line 182
+% Updated: November 4, 2017 - ssg, for use with ER10X; 200 to 20,000 Hz.
+%           Can now set reflectance coeffients (made them public properties)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 properties (SetAccess = private)
@@ -89,8 +91,6 @@ properties (SetAccess = private)
     cavityLengths_est % estimate of cavity lengths based on resonances in PL
     timeStamp_recordings % when the recordings were made
     timeStamp_analysis % when the analysis was done
-    reflNum % reflectance of cavity
-    reflDenom
 end
 properties (SetAccess = public)
     fs % sampling rate (Hz)
@@ -105,9 +105,12 @@ properties (SetAccess = public)
     fileName % name of file where the recordings are saved. This will be used to save the calibration as well
     thevCalPathName
     cavityRecordingsPathName
-    minimizationType = 2 % Minimize the error on (1) pressure or (2) impedance
+    minimizationType = 1 % Minimize the error on (1) pressure or (2) impedance
     plot_dB = 1; % if ==1, plot magnitudes in dB, else plot magnitudes in linear units
     autoPlot = 1; %turn on and off automatic plotting when finished calculating
+    reflNum % reflectance of cavity
+    reflDenom
+    
 end
 properties (Dependent = true, SetAccess = private) 
     d % used by Keefe equations to calculate c and z0
@@ -167,15 +170,23 @@ methods
         freqIndices(obj);
         waveNumber(obj);
         calculate_PL(obj);
-        obj.reflNum = .995; % estimated cavity reflectance
-        obj.reflDenom = .995;
+        % Reducing R in the numerator reduces the notch depth; reducing R 
+        % in the denominator reduces the peak height. 
+        if isempty(obj.reflNum)
+            obj.reflNum = .995; % estimated cavity reflectance
+        end
+        if isempty(obj.reflDenom)
+            obj.reflDenom = .995;
+        end
+        %obj.reflNum = 1; % estimated cavity reflectance; numerator reduces notch depth
+        %obj.reflDenom = 1; % denomonator reduces the peak height
         % ------------- Begin iterative fitting to find optimimized cavity lengths.
         %               There are two fitting options: 1) Minimize the
         %               error between ideal and calculated PRESSURE (Neely
         %               method). 2) Minimize the error between ideal and
         %               calculated IMPEDANCE (Goodman method).
         save(['C:\myWork\ARLas\temp.mat'],'obj') % Save to an external file to be used during fminsearch
-        op = optimset('Display','off','MaxIter',15000); % optimize to find best tube parameters
+        op = optimset('Display','off','MaxIter',1000); % optimize to find best tube parameters
         % fminsearch minimizes the output of the function findOptimalLengths.m, using 
         % cavityLengths_est as a starting point for the search
         
@@ -183,48 +194,98 @@ methods
         % use with the new 10X system, and for that system the estimated
         % lengths from the resonance is less accurage and better
         % performance is obtained using this modified code
-        if obj.minimizationType == 1 % minimize pressure error
-            obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_est,op);
-        elseif obj.minimizationType == 2 % minimize impedance error
-            obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_est,op);
-        end
 %         if obj.minimizationType == 1 % minimize pressure error
-%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_nominal,op);
+%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_est,op);
 %         elseif obj.minimizationType == 2 % minimize impedance error
-%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_nominal,op);
+%             obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_est,op);
 %         end
+        if obj.minimizationType == 1 % minimize pressure error
+            obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_nominal',op);
+            obj.cavityLengths_optimal = fminsearch('findOptimalLengths1',obj.cavityLengths_optimal,op);
+        elseif obj.minimizationType == 2 % minimize impedance error
+            obj.cavityLengths_optimal = fminsearch('findOptimalLengths2',obj.cavityLengths_nominal',op);
+        end
+        
         % ------------- End iterative fitting to find optimimized cavity lengths.        
         % optimize for cavity reflectance
-        doPlot = 0;
-        rMin = 0.95; % assumed minimum reflectance
-        rMax = 1.00; % assumed maximum reflectance
-        stepSize = 0.001;
-        refl = (rMin:stepSize:rMax)';
-        nn = length(refl);
-        epsilon = zeros(nn,1);
-        for ii=1:nn
-            obj.reflNum = refl(ii);
-            obj.reflDenom = refl(ii);
-            calculate_ZLi(obj.cavityLengths_optimal,obj) % calculate ideal load impedance (ZLi)
-            calculate_source(obj) % calculate source thevenin parameters (PS, ZS)
-            calculate_ZL(obj) % calculate load impedance (ZL), given source parameters
-            calculate_PLi(obj) % calculate ideal load pressure (PLi)
-            calculateError(obj)  % done on truncated freq vector
-            if obj.minimizationType == 1 % minimize pressure error
-                epsilon(ii,1) = obj.epsilon.pT;
-            elseif obj.minimizationType == 2 % minimize impedance error
-                epsilon(ii,1) = obj.epsilon.zT;
+        doRefl = 0; % optimize for reflectance (0, 1, or 2)
+        % old way ---        
+        if doRefl == 1
+            doPlot = 0;
+            rMin = 0.9; %0.9; % assumed minimum reflectance
+            rMax = 1.0; % assumed maximum reflectance
+            stepSize = 0.001;
+            refl = (rMin:stepSize:rMax)';
+            nn = length(refl);
+            epsilon = zeros(nn,1);
+            for ii=1:nn
+                obj.reflNum = refl(ii);
+                obj.reflDenom = refl(ii);
+                calculate_ZLi(obj.cavityLengths_optimal,obj) % calculate ideal load impedance (ZLi)
+                calculate_source(obj) % calculate source thevenin parameters (PS, ZS)
+                calculate_ZL(obj) % calculate load impedance (ZL), given source parameters
+                calculate_PLi(obj) % calculate ideal load pressure (PLi)
+                calculateError(obj)  % done on truncated freq vector
+                if obj.minimizationType == 1 % minimize pressure error
+                    epsilon(ii,1) = obj.epsilon.pT;
+                elseif obj.minimizationType == 2 % minimize impedance error
+                    epsilon(ii,1) = obj.epsilon.zT;
+                end
             end
+            [y,indx] = min(epsilon);
+            if doPlot == 1
+                figure
+                plot(refl,epsilon,'b*-')        
+                hold on
+                plot(refl(indx),y,'r*-')
+            end
+            obj.reflNum = refl(indx);
+            obj.reflDenom = refl(indx);
+        elseif doRefl == 2
+        % new way ----
+            doPlot = 0;
+            rMin = 0.9; %0.9; % assumed minimum reflectance
+            rMax = 1.20; % assumed maximum reflectance
+            stepSize = 0.01;
+            refl = (rMin:stepSize:rMax)';
+            nn = length(refl);
+            epsilon = zeros(nn,nn);
+            for ii=1:nn
+                ii
+                obj.reflNum = refl(ii);
+                for jj=1:nn
+                    obj.reflDenom = refl(jj);
+                    calculate_ZLi(obj.cavityLengths_optimal,obj) % calculate ideal load impedance (ZLi)
+                    calculate_source(obj) % calculate source thevenin parameters (PS, ZS)
+                    calculate_ZL(obj) % calculate load impedance (ZL), given source parameters
+                    calculate_PLi(obj) % calculate ideal load pressure (PLi)
+                    calculateError(obj)  % done on truncated freq vector
+                    if obj.minimizationType == 1 % minimize pressure error
+                        epsilon(ii,jj) = obj.epsilon.pT;
+                    elseif obj.minimizationType == 2 % minimize impedance error
+                        epsilon(ii,jj) = obj.epsilon.zT;
+                    end
+                end
+            end
+            eee = epsilon(:);
+            [ee,ei] = min(eee);
+            [rr,cc] = find(epsilon == ee);
+            num = refl(rr); % notch depth decreases as value decreases
+            den = refl(cc); % peak height decreases as value decreases
+            obj.reflNum = den;%num;
+            obj.reflDenom = num; %den;
+
+            [y,indx] = min(epsilon);
+            if doPlot == 1
+                figure
+                plot(refl,epsilon,'b*-')        
+                hold on
+                plot(refl(indx),y,'r*-')
+            end
+        else
+            obj.reflNum = 1;
+            obj.reflDenom = 1;
         end
-        [y,indx] = min(epsilon);
-        if doPlot == 1
-            figure
-            plot(refl,epsilon,'b*-')        
-            hold on
-            plot(refl(indx),y,'r*-')
-        end
-        obj.reflNum = refl(indx);
-        obj.reflDenom = refl(indx);
         calculate_ZLi(obj.cavityLengths_optimal,obj) % calculate ideal load impedance (ZLi)
         calculate_source(obj) % calculate source thevenin parameters (PS, ZS)
         calculate_ZL(obj) % calculate load impedance (ZL), given source parameters
@@ -374,7 +435,7 @@ methods
         if obj.plot_dB == 1
             pcMag = 20*log10(abs(obj.PLi));
             plMag = 20*log10(abs(obj.PL));
-            ytxt = 'Pressure Magnitude (dB ohms)';
+            ytxt = 'Pressure Magnitude (dB)';
         else 
             pcMag = abs(obj.PLi);
             plMag = abs(obj.PL);

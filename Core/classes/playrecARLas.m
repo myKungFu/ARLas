@@ -8,11 +8,11 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: August 14, 2017
+% Last Updated: November 4, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.08.14';
+    arlasVersion = '2017.11.04';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -1238,6 +1238,8 @@ methods
                 header.userInfo = objPlayrec.userInfo;
                 header.skippedPages = objPlayrec.skippedPages; % lists skipped files
                 header.aborted = objPlayrec.killRun; % whether or not the run was aborted using the abort button
+                header.SOS = objPlayrec.SOS; % save the filter that was used.
+                header.G = objPlayrec.G;
                 
                 save([pathName,fileName],'data','header')
                 objPlayrec.savedFiles{ii} = fileName; % tell arlas what the most recent save was (file name)

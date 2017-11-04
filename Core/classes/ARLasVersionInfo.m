@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: August 14, 2017
+% Last Updated: November 4, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -114,5 +114,9 @@ function [] = ARLasVersionInfo()
 %       uses playrec's system delay estimate. Found it was not providing
 %       benefit on windows systems, and was causing problems on Mac.
 %
-
+% 2017.11.04
+%   playrecARlas now returns the IIR filter information (SOS and G). This
+%       allows users to apply the filter post-hoc, or to appy the same
+%       filter to stimuli that were applied to the recordings. (This was
+%       used to improve the ThevCal fitting.)
 

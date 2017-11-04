@@ -8,11 +8,11 @@ classdef initARLas < handle
 % The University of Iowas
 % Author: Shawn S. Goodman, PhD
 % Date: August 26, 2016
-% Last Updated: July 24, 2017
+% Last Updated: November 4, 2017
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.08.14';
+    arlasVersion = '2017.11.04';
     obj         % passed from arlas
     initPath    % passed from arlas
     initFile    % passed from arlas
