@@ -12,7 +12,7 @@ classdef playrecARLas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2017.11.04';
+    arlasVersion = '2018.11.14';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -592,9 +592,9 @@ methods
             end
             objPlayrec.xAxisTxt = 'Time ';
             objPlayrec.yAxisTxt = 'Amplitude ';
-            q = colormap(hsv(64)); % get the full hsv color map as a 64 by 3 matrix;
-            q(5:15,:) = []; % throw out the yellow colors
-            stepSize = floor(length(q) / objPlayrec.maxChans_in);
+            q = colormap(hsv(objPlayrec.maxChans_in)); % get the full hsv color map as a 64 by 3 matrix;
+            %q(5:15,:) = []; % throw out the yellow colors
+            stepSize = ceil(length(q) / objPlayrec.maxChans_in);
             indx = (1:1:objPlayrec.maxChans_in) * stepSize;
             objPlayrec.colorScheme = q(indx,:);
         catch ME
@@ -708,6 +708,13 @@ methods
                 NN = 1;
             else
                 NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Will load twice what was asked for, and then abort when done.
+%%%%%%%%
+%%%%%%%%
+%                NN = objPlayrec.nReps + 2;
+%%%%%%%%
+%%%%%%%%
+                
+                
             end
             if objPlayrec.nReps > 1
                 objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
@@ -735,7 +742,13 @@ methods
                 for jj=1:objPlayrec.nChans_out_now
                     buffer = objPlayrec.loadingDock.(matlab.lang.makeValidName(['Ch',num2str(objPlayrec.chans_out_now(jj))]));
                     stimTrain = [stimTrain,buffer];
-                end                            
+                end
+%%%%%%
+%%%%%%
+%                zpad = zeros(objPlayrec.systemDelay,1);
+%                pageNumList = playrec('playrec',zpad,objPlayrec.chans_out_now,objPlayrec.recDuration,objPlayrec.chans_in_now);
+%%%%%%
+%%%%%%
                 for ii=1:NN
                     pageNumList = playrec('playrec',stimTrain,objPlayrec.chans_out_now,objPlayrec.recDuration,objPlayrec.chans_in_now);
                     objPlayrec.pageFiles = [objPlayrec.pageFiles,pageNumList];

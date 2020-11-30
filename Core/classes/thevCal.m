@@ -70,6 +70,8 @@ classdef thevCal < handle
 % Updated: June 13, 2017 - ssg for use with er10x; see line 182
 % Updated: November 4, 2017 - ssg, for use with ER10X; 200 to 20,000 Hz.
 %           Can now set reflectance coeffients (made them public properties)
+% Updated: November 27, 2017 - ssg, added cuts and orig stim, so can use
+%           for making ear canal recordings in order to apply the calibration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 properties (SetAccess = private)
@@ -110,7 +112,9 @@ properties (SetAccess = public)
     autoPlot = 1; %turn on and off automatic plotting when finished calculating
     reflNum % reflectance of cavity
     reflDenom
-    
+    stimOrig % stimulus presented to the sound card DAC
+    cut1     % cut sample for start of stimulus
+    cut2     % cut sample for end of stimulus
 end
 properties (Dependent = true, SetAccess = private) 
     d % used by Keefe equations to calculate c and z0
@@ -139,10 +143,13 @@ methods
             t.fmin = recordingParams.fmin;
             t.fmax = recordingParams.fmax;
             t.timeStamp_recordings = recordingParams.timeStamp;
-            %t.micSN = recordingParams.micSN; 
             t.fileName = recordingParams.fileName;
             t.thevCalPathName = recordingParams.thevCalPathName;
             t.cavityRecordingsPathName = recordingParams.cavityRecordingsPathName;
+            t.stimOrig = recordingParams.stimOrig; % stimulus presented to the sound card DAC
+            t.cut1 = recordingParams.cut1; % cut sample for start of stimulus
+            t.cut2 = recordingParams.cut2; % cut sample for end of stimulus
+            
         end
         if nargin >= 2
             t.stimulus = stimulus;

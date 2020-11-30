@@ -119,4 +119,8 @@ function [] = ARLasVersionInfo()
 %       allows users to apply the filter post-hoc, or to appy the same
 %       filter to stimuli that were applied to the recordings. (This was
 %       used to improve the ThevCal fitting.)
+%
+% 2018.11.14
+%   playrecARlas updated to work with sound cards that have a larger number
+%       of channels (or virtual channels). Updates around line 595.
 
