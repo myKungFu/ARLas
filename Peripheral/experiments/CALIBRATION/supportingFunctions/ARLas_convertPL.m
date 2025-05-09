@@ -48,7 +48,9 @@ function [pl,Pl,phi,other,wf] = ARLas_convertPL(X,isc)
         nfft = size(X,1);   % no zero padding will be added to x, but cal must be interpolated
         zpadN = 0; % number of samples in the zero padding
         freqNew = (0:1:nfft-1)'*(fs/nfft);
-        [~,fminIndx] = min(abs(freqNew-freq(1)));
+        % [~,fminIndx] = min(abs(freqNew-freq(1))); removed and replaced
+        % with following line 9/7/2022 ssg
+        [~,fminIndx] = min(abs(freqNew-fmin));
         [~,fmaxIndx] = min(abs(freqNew-fmax));
         freqNew = freqNew(fminIndx:fmaxIndx);
         ZL = interp1(freq,ZL,freqNew,'pchip');
@@ -92,6 +94,9 @@ function [pl,Pl,phi,other,wf] = ARLas_convertPL(X,isc)
     FPL = smoother(freq,FPL,SPL);
     RPL = smoother(freq,RPL,SPL);
     IPL = abs(FPL) + abs(RPL);        % integrated pressure level
+    
+    IPL2 = IPL.*cos(angle(FPL)) + 1i*IPL.*sin(angle(FPL)); % ipl using fpl phase
+    
     PR = abs(RPL).^2 ./ abs(FPL).^2;  % power reflectance
     ZL = smoother(freq,ZL,SPL);
 % -----    
@@ -121,6 +126,12 @@ function [pl,Pl,phi,other,wf] = ARLas_convertPL(X,isc)
     fpl_full = real(ifft(FPL_full));
     fpl_full = fpl_full(1:length(spl_orig));
     fpl_full = ARLas_ramp(fpl_full,fs,0.001);
+
+    IPL2_full = [pad1;IPL2*scaling;pad2]; % intergrated pressure level using forward phase
+    IPL2_full = [IPL2_full(1:nyquist);flipud(conj(IPL2_full(2:nyquist-1)))];
+    ipl2_full = real(ifft(IPL2_full));
+    ipl2_full = ipl2_full(1:length(spl_orig));
+    ipl2_full = ARLas_ramp(ipl2_full,fs,0.001);    
 
     IPL_full = [pad1;IPL*scaling;pad2]; % integrated pressure level
     IPL_full = [IPL_full(1:nyquist);flipud(conj(IPL_full(2:nyquist-1)))];
@@ -201,6 +212,7 @@ function [pl,Pl,phi,other,wf] = ARLas_convertPL(X,isc)
     wf.fpl = fpl_full; % fpl corrected recording (use this for stimulus only)
     wf.rpl = rpl_full; % rpl corrected recording (use this for stimulus only)
     wf.ipl = ipl_full; % this has a constant, but arbitrary group delay.
+    wf.ipl2 = ipl2_full; % ipl corrected recording, using fpl phase
 end
 
 % internal functions ------------------------------------------------------

@@ -8,11 +8,11 @@ classdef playrecARLas < handle
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: September 13, 2016
-% Last Updated: November 4, 2017
+% Last Updated: January 7, 2025 -- ssg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2018.11.14';
+    arlasVersion = '2025.01.07';
     sep                 % path delimiter appriate for the current operating system 
     map                 % struct containing file paths
     binFileName         % binary file path (full) and name (partial)
@@ -98,6 +98,7 @@ properties (SetAccess = public)
     
     userInfo            % Empty variable that can be filled by user with whatever they want.
                         %   will be written to the header file.
+    servedNeat          % no extra padding to account for delay
 end
 methods
     function objPlayrec = playrecARLas(objInit) % instantiate object of class initARLas
@@ -136,6 +137,7 @@ methods
             objPlayrec.failedRun = 0;
             objPlayrec.deadInTheWater = 0;
             objPlayrec.usePlayrecDelay = 0;
+            objPlayrec.servedNeat = 0; % default is to add zero padding.
         catch ME
             errorTxt = {'  Issue: Unexpected error creating object of class playrecARLas.'
                  '  Action: None.'
@@ -396,6 +398,9 @@ methods
                     objPlayrec.saveData % save the data in mat files, one matrix per channel
                     return
                 else
+                    if objPlayrec.servedNeat == 1
+                        %objPlayrec.completedBuffers
+                    end
                     objPlayrec.writeData % stream raw recorded data to disk
                     pause(objPlayrec.writePauseLen)
                     if isempty(objPlayrec.pageFiles) || length(objPlayrec.pageFiles)<1
@@ -405,8 +410,10 @@ methods
             end
             playrec('delPage'); % kill any remaining sound
             objPlayrec.cleanUp % close down any open fids
-            objPlayrec.retrieveData % get the written raw data
-            objPlayrec.saveData % save the data in mat files, one matrix per channel
+            %if objPlayrec.servedNeat == 0
+                objPlayrec.retrieveData % get the written raw data
+                objPlayrec.saveData % save the data in mat files, one matrix per channel
+            %end
         catch ME
             objPlayrec.killRun = 1;
             objPlayrec.killPlots
@@ -449,7 +456,8 @@ methods
             objPlayrec.killPlots
             if objPlayrec.deadInTheWater == 1
                 return
-            else objPlayrec.deadInTheWater = 1;
+            else
+                objPlayrec.deadInTheWater = 1;
             end            
             errorTxt = {'  Issue: Error initializing playrecARLas variables.'
                  '  Action: None.'
@@ -668,60 +676,71 @@ methods
             objPlayrec.printError(ME)            
         end
         try % re-initialize playrec, get current system latencies
-            if playrec('isInitialised')
-                playrec('reset');
-            end
-            playrec('init',objPlayrec.fs,objPlayrec.id_out,objPlayrec.id_in);
-            [playLatency,playSuggestedLatency] = playrec('getPlayLatency');
-            [recLatency,recSuggestedLatency] = playrec('getRecLatency');
-            playrec('reset');
-            fs = objPlayrec.fs; % sample rate
-            pd = objPlayrec.id_out; % play device
-            rd = objPlayrec.id_in; % rec device
-            pmc = objPlayrec.maxChans_out; % play max channel
-            rmc = objPlayrec.maxChans_in; % rec max channel
-            fpb = 0; % frames per buffer
-            psl = playSuggestedLatency; % play suggested latency
-            rsl = recSuggestedLatency; % rec suggested latency
-            if objPlayrec.usePlayrecDelay == 1
-                preferredDelay = round(fs*(recSuggestedLatency + playSuggestedLatency)); % system delay according to playrec
-                if preferredDelay > objPlayrec.systemDelay
-                    ratio = objPlayrec.systemDelay / preferredDelay;
-                else
-                    ratio = preferredDelay / objPlayrec.systemDelay;
+            if objPlayrec.servedNeat == 1 % "servedNeat" means stripped down, no extra padding, lean and mean and fast
+                % always using saved system delay
+                if ~playrec('isInitialised')
+                    playrec('reset');
                 end
-                if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
-                    objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
-                else
-                    if objPlayrec.systemDelay ~= 0
-                        disp(' ')
-                        disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
-                        disp('       Using measured delay, not playrec estimated delay.')
-                        disp(' ')
+                fs = objPlayrec.fs; % sample rate
+                objPlayrec.writePauseLen = (objPlayrec.nSamples / objPlayrec.fs) * 0.5; % estimate delay between each check for completed buffers
+                NN = objPlayrec.nReps; %NN = 1;
+                objPlayrec.extraBuffers = 0;
+                objPlayrec.plotDelay = 0;                
+            else
+                tic
+                if playrec('isInitialised')
+                    playrec('reset');
+                end
+                playrec('init',objPlayrec.fs,objPlayrec.id_out,objPlayrec.id_in);
+                [playLatency,playSuggestedLatency] = playrec('getPlayLatency');
+                [recLatency,recSuggestedLatency] = playrec('getRecLatency');
+                playrec('reset');
+                fs = objPlayrec.fs; % sample rate
+                pd = objPlayrec.id_out; % play device
+                rd = objPlayrec.id_in; % rec device
+                pmc = objPlayrec.maxChans_out; % play max channel
+                rmc = objPlayrec.maxChans_in; % rec max channel
+                fpb = 0; % frames per buffer
+                psl = playSuggestedLatency; % play suggested latency
+                rsl = recSuggestedLatency; % rec suggested latency
+                if objPlayrec.usePlayrecDelay == 1
+                    preferredDelay = round(fs*(recSuggestedLatency + playSuggestedLatency)); % system delay according to playrec
+                    if preferredDelay > objPlayrec.systemDelay
+                        ratio = objPlayrec.systemDelay / preferredDelay;
+                    else
+                        ratio = preferredDelay / objPlayrec.systemDelay;
+                    end
+                    if ratio > 0.95 % if preferred delay (playrec's estimate) is close to the user's calculated delay
+                        objPlayrec.systemDelay = preferredDelay; % use playrec's estimate
+                    else
+                        if objPlayrec.systemDelay ~= 0
+                            disp(' ')
+                            disp('ALERT: playrec estimated delay is more than 95% of measured delay!')
+                            disp('       Using measured delay, not playrec estimated delay.')
+                            disp(' ')
+                        end
                     end
                 end
-            end
-            playrec('init',fs,pd,rd,pmc,rmc,fpb,psl,rsl);
-            pause(.001)
-            objPlayrec.writePauseLen = (objPlayrec.nSamples / objPlayrec.fs) * 0.5; % estimate delay between each check for completed buffers
-            if objPlayrec.nReps == 1
-                NN = 1;
-            else
-                NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Will load twice what was asked for, and then abort when done.
-%%%%%%%%
-%%%%%%%%
-%                NN = objPlayrec.nReps + 2;
-%%%%%%%%
-%%%%%%%%
-                
-                
-            end
-            if objPlayrec.nReps > 1
-                objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
-                objPlayrec.plotDelay = mod(objPlayrec.systemDelay,objPlayrec.nSamples); % how much delay (based on system delay) to account for when plotting
-            else
-                objPlayrec.extraBuffers = 0;
-                objPlayrec.plotDelay = 0;
+                playrec('init',fs,pd,rd,pmc,rmc,fpb,psl,rsl);
+                pause(.001)
+                objPlayrec.writePauseLen = (objPlayrec.nSamples / objPlayrec.fs) * 0.5; % estimate delay between each check for completed buffers
+                if objPlayrec.nReps == 1
+                    NN = 1;
+                else
+                    NN = objPlayrec.nReps * 2; % number of buffers to load into queue. Will load twice what was asked for, and then abort when done.
+    %%%%%%%%
+    %%%%%%%%
+    %                NN = objPlayrec.nReps + 2;
+    %%%%%%%%
+    %%%%%%%%
+                end
+                if objPlayrec.nReps > 1
+                    objPlayrec.extraBuffers = floor(objPlayrec.systemDelay / objPlayrec.nSamples) + 1; % number of extra buffers needed to account for system delay
+                    objPlayrec.plotDelay = mod(objPlayrec.systemDelay,objPlayrec.nSamples); % how much delay (based on system delay) to account for when plotting
+                else
+                    objPlayrec.extraBuffers = 0;
+                    objPlayrec.plotDelay = 0;
+                end
             end
         catch ME
             if objPlayrec.deadInTheWater == 1
@@ -799,9 +818,15 @@ methods
             for ii=1:n % find and index which recordings are finished
                 isdone(ii,1) = playrec('isFinished',objPlayrec.pageFiles(ii));
             end
-            if objPlayrec.mu == 0  % if this is the first recorded buffer set
-                if sum(isdone) < 2 && objPlayrec.nReps > 1 % if there are less than 2 buffers
+            if objPlayrec.servedNeat == 1
+                if sum(isdone) < 1 && objPlayrec.nReps > 1 % if there are less than 1 buffer
                     return         % wait until there are at least 2 buffers
+                end
+            else % the usual way
+                if objPlayrec.mu == 0  % if this is the first recorded buffer set
+                    if sum(isdone) < 2 && objPlayrec.nReps > 1 % if there are less than 2 buffers
+                        return         % wait until there are at least 2 buffers
+                    end
                 end
             end
             objPlayrec.completedPageFiles = sum(isdone); % total number of completed recordings
@@ -1033,7 +1058,7 @@ methods
             if any(objPlayrec.fid == -1)
                 errorTxt = {'  Issue: Error retrieving written data. Probable error obtaining fid using fopen.'
                      '  Action: None.'
-                     '  Location: in playrecARLas.retrieveData.'
+                     '  Location: in playrecARLas.retrieveData msg1.'
                     };
                 errorMsgARLas(errorTxt);
                 objPlayrec.objInit.obj.buttonManager(51)
@@ -1046,7 +1071,7 @@ methods
             end            
             errorTxt = {'  Issue: Error retrieving written data.'
                  '  Action: None.'
-                 '  Location: in playrecARLas.retrieveData.'
+                 '  Location: in playrecARLas.retrieveData msg2.'
                 };
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
@@ -1058,7 +1083,7 @@ methods
                 if status == -1 % status is 0 on success and -1 on failure.
                     errorTxt = {'  Issue: Error using fseek to retrieve written data.'
                          '  Action: None.'
-                         '  Location: in playrecARLas.retrieveData.'
+                         '  Location: in playrecARLas.retrieveData msg3.'
                         };
                     errorMsgARLas(errorTxt);
                     objPlayrec.objInit.obj.buttonManager(51) 
@@ -1076,28 +1101,35 @@ methods
                     expectedLength = objPlayrec.nReps * objPlayrec.nSamples; % number of samples after shifting to fix system delay
                     actualLength = floor(length(X)/objPlayrec.nSamples) * objPlayrec.nSamples; % actual length may be different if aborted
                     if actualLength < expectedLength % the case when run aborted early
-                        X = X(1:actualLength); % include only the desired number of samples (discard any extras, if they exist)
-                        warnTxt = {['  Issue: Run aborted. ',num2str(floor(length(X)/objPlayrec.nSamples)),' of ',num2str(objPlayrec.nReps),' reps saved.']
-                             '  Action: None.'
-                             '  Location: in playrecARLas.retrieveData.'
-                            };
-                        warnMsgARLas(warnTxt);
-                        objPlayrec.objInit.obj.buttonManager(51)
-                        %objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
-                        objPlayrec.nReps = ([{floor(length(X)/objPlayrec.nSamples)},{'ok'}]); % update nReps to reflect actual number recorded
+                        if objPlayrec.servedNeat == 0
+                            X = X(1:actualLength); % include only the desired number of samples (discard any extras, if they exist)
+                            warnTxt = {['  Issue: Run aborted. ',num2str(floor(length(X)/objPlayrec.nSamples)),' of ',num2str(objPlayrec.nReps),' reps saved.']
+                                 '  Action: None.'
+                                 '  Location: in playrecARLas.retrieveData msg4.'
+                                };
+                            warnMsgARLas(warnTxt);
+                            objPlayrec.objInit.obj.buttonManager(51)
+                            %objPlayrec.nReps = floor(length(X)/objPlayrec.nSamples); % update nReps to reflect actual number recorded
+                            objPlayrec.nReps = ([{floor(length(X)/objPlayrec.nSamples)},{'ok'}]); % update nReps to reflect actual number recorded
+                        else
+                            X = zeros(expectedLength,1)';
+                        end
                     else
                         X = X(1:expectedLength); % include only the desired number of samples (discard any extras, if they exist)
                     end
+
                 end
                 objPlayrec.Data(:,ii) = X; % pass the recorded data to arlas
                 if ~isempty(objPlayrec.skippedPages)
-                    if length(objPlayrec.skippedPages) > 1
-                        warnTxt = {'  Issue: Page files were skipped!.'
-                             ['  ',num2str(length(objPlayrec.skippedPages)),' pages were identified and discarded.']
-                             '  Action: None.'
-                             '  Location: in playrecARLas.retrieveData.'
-                            };
-                        warnMsgARLas(warnTxt);
+                    if objPlayrec.servedNeat == 0
+                        if length(objPlayrec.skippedPages) > 1
+                            warnTxt = {'  Issue: Page files were skipped!.'
+                                 ['  ',num2str(length(objPlayrec.skippedPages)),' pages were identified and discarded.']
+                                 '  Action: None.'
+                                 '  Location: in playrecARLas.retrieveData msg5.'
+                                };
+                            warnMsgARLas(warnTxt);
+                        end
                     end
                 end
             end
@@ -1109,7 +1141,7 @@ methods
             end            
             errorTxt = {'  Issue: Error reading saved data.'
                  '  Action: None.'
-                 '  Location: in playrecARLas.retrieveData.'
+                 '  Location: in playrecARLas.retrieveData msg6.'
                 };
             errorMsgARLas(errorTxt);
             objPlayrec.objInit.obj.buttonManager(51)
@@ -1118,11 +1150,18 @@ methods
     end
     function saveData(varargin) % save data (header and data) in .mat files to the folders specified by arlas
         objPlayrec = varargin{1};
+        if objPlayrec.servedNeat == 1
+            return
+        end
         try % determine location and filename to use when saving data
-            basePath = objPlayrec.map.data; % base location to write data
-            expName = objPlayrec.objInit.obj.experimentID;
-            subjName = objPlayrec.objInit.obj.subjectID;
-            pathName = [basePath,expName,objPlayrec.sep,subjName,objPlayrec.sep];
+            %basePath = objPlayrec.map.data; % base location to write data
+            %expName = objPlayrec.objInit.obj.experimentID;
+            %subjName = objPlayrec.objInit.obj.subjectID;
+            %runDate = objPlayrec.objInit.obj.runDate; % added 7/31/2021 -- ssg
+            %pathName =[basePath,expName,objPlayrec.sep,subjName,objPlayrec.sep]; % old way
+            %pathName =[basePath, runDate,objPlayrec.sep, subjName,objPlayrec.sep, expName,objPlayrec.sep]; % new way 7/31/2021 -- ssg
+            pathName = objPlayrec.objInit.obj.savingGrace;
+            
             if exist(pathName,'dir') ~= 7 % if directory does not exist
                 errorTxt = {'  Issue: Expected directory does not exist.'
                          '  Action: aborting data save operation.'
@@ -1274,7 +1313,11 @@ methods
     end
     function cleanUp(~) % close all open file identifiers
         try 
-            fids = fopen('all'); % close all files open for read or write access
+            try
+                fids = openedFiles; %fopen('all'); % close all files open for read or write access -- new in 2024 versions
+            catch
+                fids = fopen('all'); % close all files open for read or write access -- prior to 2024 versions
+            end
             if ~isempty(fids)
                 for ii=1:length(fids)
                     fclose(fids(ii));
@@ -1561,7 +1604,7 @@ methods
         %objPlayrec.nReps = N;
         objPlayrec.nReps = ([{N},{'ok'}]);
     end
-    function objPlayrec = set.nReps(objPlayrec,dummy)
+    function set.nReps(objPlayrec,dummy)
         %objPlayrec = varargin{1};
         %dummy = varargin{2};
         if size(dummy,2) ~= 2

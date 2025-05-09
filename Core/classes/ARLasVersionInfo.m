@@ -10,7 +10,7 @@ function [] = ARLasVersionInfo()
 % The University of Iowa
 % Author: Shawn S. Goodman, PhD
 % Date: November 16, 2016
-% Last Updated: November 4, 2017
+% Last Updated: January 7, 2025
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % 2016.11.16
@@ -123,4 +123,52 @@ function [] = ARLasVersionInfo()
 % 2018.11.14
 %   playrecARlas updated to work with sound cards that have a larger number
 %       of channels (or virtual channels). Updates around line 595.
+%
+% 2021.07.07
+%    THIS VERSION HAS added hack to switch data writing to D drive, NOT C
+%    DRIVE!
+%
+% 2021.31.07
+%    Fixed the hack above more elegantly. Implemented two new files in 
+%    Peripheral\sysConfigs:  pathSetup.m and fileNamesSetup.m. The former
+%    is used to set things like writing to other locations. The latter is
+%    to suggest experiment names and pre-populate the ID field accordingly.
+%    This will help maintain consistency across different experimenters.
+%    Also made a major change to file structure writing. Now everyting goes
+%    as follows:
+%       Data\
+%             SubjID\
+%                    SubjID_31JUL2021\
+%                                     SubjID_31JUL2021_testName_run1
+%
+%    This will be a big help keeping track of multiplie runs withing and
+%    across multipl visits from the same subjects. Several core updates
+%    were made ot facilitate these changes.
+%
+% 2021.04.08
+%    Had a big problem forgetting to disable ER10X output limiter.
+%    Implemented a reminder dialog box when arlas starts. ARLas checks
+%    hardwareSetup (with a new field) to see whether limiter is supposed to
+%    be being used.
+%
+% 2022.03.23
+%    Now using standardized file structure for calibrations.
+%    Added code to arlas so that if thevCal, LTCal, micCal, or calCheck
+%    folders are not present under ...Peripheral\calibrations\, they are
+%    automatically created.
+% 2022.04.01
+%    Updated the function enterID in arlas.m. Now adds newly created
+%    folders to the path.
+%
+% 2024.10.04
+%   In method "cleanUp" (in playrecARLas), replaced function call fopen with
+%   function call openedFiles. The code now tries both functions to retain 
+%   backwards compatability.
+%
+% 2025.01.07
+%   In playrecARLas, added new public variable "servedNeat". This works
+%   with the audiogram and plays a stripped down version, with no attempt
+%   to zero pad. Also does not re-initialize and does not write data. Much
+%   faster. Set =0 (default, old standard way) or =1 for this new quick
+%   version.
 

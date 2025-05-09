@@ -12,7 +12,7 @@ classdef initARLas < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2018.11.14';
+    arlasVersion = '2025.01.07'
     obj         % passed from arlas
     initPath    % passed from arlas
     initFile    % passed from arlas

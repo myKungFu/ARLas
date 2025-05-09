@@ -20,9 +20,11 @@ classdef thevCal_new < handle
 % Auditory Research Lab, The University of Iowa
 % Deptartment of Communication Sciences & Disorders
 % The University of Iowa
-% Authors: Shawn Goodman & Sawyer Goetz
+% Author: Shawn Goodman
 % Date: March 18 - June 22, 2018
 % Updated: October 12, 2019 -- ssg
+% Updated: July 1, 2021 -- ssg -- made applyMicCorrection and micCorrection public properties.
+% Upadated: July 5, 2021 -- ssg -- added info about stimGain and outputLimiter enabled
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 properties (SetAccess = private)
@@ -33,7 +35,6 @@ properties (SetAccess = private)
     stimulus
     recordings
     recordingsOrig
-    micCorrection
     
     nCavities
     nfft
@@ -61,6 +62,8 @@ properties (SetAccess = private)
     
     epsilon
     optSwitch % switch to optimize lengths ('L') or tau ('T')
+    stimGain_dB
+    outputLimiterEnabled
     
 end
 
@@ -76,6 +79,8 @@ properties (SetAccess = public)
     cut1
     cut2
     applyMicCorrection
+    micCorrection
+
 end
 
 methods
@@ -90,6 +95,8 @@ methods
         t.recordings = recordings;
         t.recordingsOrig = recordings; % original recordings; no mic correction
         t.stimOrig = recordingParams.stimOrig; % original, electrical drive for the stimulus 
+        t.stimGain_dB = recordingParams.stimGain_dB; % reduction in dB from full out stimulus
+        t.outputLimiterEnabled = recordingParams.params.outputLimiterEnabled; % whether the output limiter is enabled or not
         t.cut1 = recordingParams.cut1;
         t.cut2 = recordingParams.cut2;
         t.stimFilt = recordingParams.stimFilt;

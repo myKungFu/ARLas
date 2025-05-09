@@ -9,10 +9,14 @@ classdef arlas < handle
 % Author: Shawn S. Goodman, PhD
 % Date: September 14, 2016
 % Last Updated: November 4, 2017
+% Last Updated: August 4, 2021
+% Last Updated: March 23, 2022
+% Last Updated: November 17, 2023 -- ssg -- fixed an error in testing for
+%                       version control
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    arlasVersion = '2018.11.14';
+    arlasVersion = '2025.01.07'
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     initPath
@@ -63,6 +67,8 @@ properties (SetAccess = public)
     subjectID
     experimentID
     operatorID
+    runDate % date on which the test is running. Added 7/31/2021 -- ssg
+    savingGrace % full path name for saving data
 end
 methods
     function obj = arlas(~) % initialize object of class initARLas
@@ -91,11 +97,20 @@ methods
             addpath(genpath(base)) % add all directories and subdirectories 
             cd(base) % change directory to the base location (will change directories back home upon exit)
             format compact % save space in command window
+            
             % create a map to needed directories
-            obj.map.calibrations = [base,'Peripheral',obj.sep,'calibrations',obj.sep];
-            obj.map.experiments = [base,'Peripheral',obj.sep,'experiments',obj.sep];
-            obj.map.sysConfigs = [base,'Peripheral',obj.sep,'sysConfigs',obj.sep];
-            obj.map.data = [base,'Data',obj.sep];
+            try % new version 7/31/2021 -- ssg
+                obj.map = pathSetup(base); % this is saved in the peripheral folder
+            catch
+                obj.map.calibrations = [base,'Peripheral',obj.sep,'calibrations',obj.sep];
+                obj.map.experiments = [base,'Peripheral',obj.sep,'experiments',obj.sep];
+                obj.map.sysConfigs = [base,'Peripheral',obj.sep,'sysConfigs',obj.sep];
+                % hack added 7/6/2021 -- ssg -- for FX, save data to drive D
+                    %dataBase = 'D:\myWork\ARLas\';
+                    %obj.map.data = [dataBase,'Data',obj.sep];
+                % end hack -------------------------------------------------            
+                obj.map.data = [base,'Data',obj.sep];
+            end            
             % check to make sure that these directories exist; if not, alert user
             errorTxt = {'  Issue: Unexpected ARLas directory structure found.'
                  '  Action:  Aborting ARLas.'
@@ -147,6 +162,25 @@ methods
                 errorMsgARLas(errorTxt);
                 return
             end
+            
+            % specific calibration file structure. Added 3/23/2022 -- ssg
+            if exist([obj.map.calibrations,'thevCals'],'dir') ~= 7
+                mkdir([obj.map.calibrations,'thevCals'])
+                addpath(genpath([obj.map.calibrations,'thevCals'])) 
+            end
+            if exist([obj.map.calibrations,'micCals'],'dir') ~= 7
+                mkdir([obj.map.calibrations,'micCals'])
+                addpath(genpath([obj.map.calibrations,'micCals'])) 
+            end
+            if exist([obj.map.calibrations,'LTCals'],'dir') ~= 7
+                mkdir([obj.map.calibrations,'LTCals'])
+                addpath(genpath([obj.map.calibrations,'LTCals'])) 
+            end
+            if exist([obj.map.calibrations,'calChecks'],'dir') ~= 7
+                mkdir([obj.map.calibrations,'calChecks'])
+                addpath(genpath([obj.map.calibrations,'calChecks'])) 
+            end
+            
             obj.initPath = obj.map.sysConfigs;
             obj.initFile = 'newSysConfig.mat';
             obj.initGui % initialize the gui
@@ -162,7 +196,7 @@ methods
             delete(test1)
             delete(test2)
             fail = 0;
-            if isempty(v0) || isempty(v0) || isempty(v2)
+            if isempty(v0) || isempty(v1) || isempty(v2)
                 fail = 1;
             end
             if ~strcmp(v0,v1)
@@ -269,6 +303,17 @@ methods
                 'Callback',@obj.abortExperiment,'Visible','on','TooltipString','ABORT current process',...
                 'CData',imread('abortGray.jpg'),'BusyAction','queue','Interruptible','on');
             obj.buttonManager(10)
+            
+            try
+                [~,~,extra] = hardwareSetup;
+            catch
+                extra.outputLimiter = 1;
+            end
+            if extra.outputLimiter == 0
+                hh = msgbox('Disable ER10X Output Limiter!');
+                hh.Position = [76.2000   78.0000  150.0000   50.1000];
+            end
+            
         catch ME
             if obj.deadInTheWater == 1
                 return
@@ -439,7 +484,7 @@ methods
                 otherwise
             end
             pause(.05)
-        catch
+        catch ME
             errorTxt = {'  Issue: Button management error.'
                  '  Action: None.'
                  '  Location: in arlas.buttonManager.'
@@ -1148,23 +1193,37 @@ methods
         rect = [left, bottom, width*5, height*2];
         obj.h_subjID = figure('Position',rect);
         set(obj.h_subjID,'Name',' ','NumberTitle','off','MenuBar','none','Resize','off','Color',[1 1 1])
-        left = 290; width = 150; height = 40; bottom = 150; % SUBJECT ID
+       %left = 290; width = 150; height = 40; bottom = 150; % SUBJECT ID
         obj.h_subjLabel = uicontrol('Style','text','String','Subject ID','FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'position',[375,150,150,40],'parent',obj.h_subjID,'HandleVisibility','off',...
             'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
-        left = 30; width = 250; height = 30; bottom = 162;
+       %left = 30; width = 250; height = 30; bottom = 162;
+       % left bottom width height
         obj.h_subjBox = uicontrol('Style','edit','String',obj.subjectID,'FontSize',13,...
-            'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
+            'position',[30 162 300 30],'parent',obj.h_subjID,'HandleVisibility','off',...
             'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
-        left = 290; width = 150; height = 40; bottom = 110; % EXPERIMENT ID
+            if isempty(obj.h_subjBox.String)
+                obj.h_subjBox.String = 'dummy';
+            end
+        left = 375; width = 150; height = 40; bottom = 110; % EXPERIMENT ID
         obj.h_expLabel = uicontrol('Style','text','String','Experiment ID','FontSize',13,...
             'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
             'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
-        left = 30; width = 250; height = 30; bottom = 122;
+        left = 30; width = 300; height = 30; bottom = 122;
         obj.h_expBox = uicontrol('Style','edit','String',obj.experimentID,'FontSize',13,...
             'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
             'BackgroundColor',[1 1 1],'Visible','on','HorizontalAlignment','left');
-        left = 290; width = 150; height = 40; bottom = 70; % OPERATOR INITIALS
+            try % added 7/31/2021 -- ssg
+                fileName = fileNamesSetup(obj.expFileName);
+            catch
+                fileName = [];
+            end
+            if ~isempty(fileName)
+                obj.h_expBox.String = fileName;
+            else
+                obj.h_expBox.String = 'dummy';
+            end
+        left = 375; width = 150; height = 40; bottom = 70; % OPERATOR INITIALS
         obj.h_opLabel = uicontrol('Style','text','String','Operator Initials','FontSize',13,...
             'position',[left bottom width height],'parent',obj.h_subjID,'HandleVisibility','off',...
             'BackgroundColor',[1 1 1],'FontAngle','italic','HorizontalAlignment','left','Visible','on');
@@ -1181,80 +1240,105 @@ methods
     end
     function enterID(varargin) % get subject, experiment, and operator IDs and save them; create folders
         obj = varargin{1};
-        subjID = get(obj.h_subjBox,'String'); % check subject ID is present
-        if ~isempty(subjID)
+        % the tag property is used here to make this window button a "two-stage trigger"
+        % Makes it do two different things: get the ID and then verify, then start the run
+        if isempty(obj.h_enterSubjID.Tag)
+            obj.h_enterSubjID.Tag = '0';
+        end
+        
+        if strcmp(obj.h_enterSubjID.Tag,'0') % if in the "get" stage
+            % get run date
+            d = datetime('today');
+            formatOut = 'dd';
+            str1 = datestr(d,formatOut,'local');
+            formatOut = 'mmm';
+            str2 = datestr(d,formatOut,'local');
+            str2 = upper(str2);
+            formatOut = 'yyyy';
+            str3 = datestr(d,formatOut,'local');
+            obj.runDate = [str1,str2,str3];
+
+            subjID = get(obj.h_subjBox,'String'); % check subject ID is present
+            if isempty(subjID)
+                uiwait(errordlg('Subject ID cannot be an empty string.','Subject ID Error','modal'))
+                return
+            end
+            expID = get(obj.h_expBox,'String'); % check experiment ID is present
+            if isempty(expID)
+                uiwait(errordlg('Experiment ID cannot be an empty string.','Experiment ID Error','modal'))
+                return
+            end
+            opID = get(obj.h_opBox,'String'); % check operator ID is present
+            if isempty(opID)
+                uiwait(errordlg('Operator Initials cannot be an empty string.','Operator ID Error','modal'))
+                return
+            end        
+
+            % if all present and accounted for
             obj.subjectID = subjID;
-        else
-            uiwait(errordlg('Subject ID cannot be an empty string.','Subject ID Error','modal'))
-            return
-        end
-        expID = get(obj.h_expBox,'String'); % check experiment ID is present
-        if ~isempty(expID)
-            d = dir(obj.map.data);
-            N = length(d);
-            match = 0;
-            for ii=3:N % look to see if experiment folder already exists
-                if d(ii).isdir
-                    if strcmp(d(ii).name,expID)
-                        match = 1;
-                    end
-                end
-                if match == 1
-                    break
-                end
-            end
-            if match
-                obj.experimentID = expID;
-            else
-                button = questdlg(['Experiment ID does not exist. Create new directory?'],...
-                    'Create Experiment Directory','Yes','No','No');
-                if strcmp(button,'No')
-                    return
-                else
-                    success = mkdir(obj.map.data,expID);
-                    if success
-                        addpath([obj.map.data,expID])
-                        obj.experimentID = expID;
-                    else
-                        error('Unable to create new Experiment Directory.')
-                    end
-                end
-            end
-            d = dir([obj.map.data,expID]);
-            N = length(d);
-            match = 0;
-            for ii=3:N % look for existing subject ID
-                if d(ii).isdir
-                    if strcmp(d(ii).name,obj.subjectID)
-                        match = 1;
-                    end
-                end
-                if match == 1
-                    break
-                end
-            end
-            if ~match
-                success = mkdir([obj.map.data,expID],obj.subjectID);
-                pathName = [obj.map.data,expID,obj.sep,obj.subjectID];
-                addpath(pathName)
+            obj.experimentID = [expID,'_run'];
+            obj.operatorID = opID;
+
+            % run through the list checking to make sure that the file path
+            % exists; else create it:
+            
+            % subject ID folder -----------------------------
+            pathName_S = [obj.map.data,  obj.subjectID]; 
+            if exist(pathName_S,'dir') == 0 % if path does not exist
+                success = mkdir(pathName_S);
                 if ~success
-                    error('Unable to create directory for subject ID.')
+                    error('Unable to create new Experiment Directory: pathName_S.')
+                end
+                addpath(genpath(pathName_S)) % add all directories and subdirectories
+            end
+            % subject ID + Date Folder -----------------------------
+            pathName_SD = [pathName_S,obj.sep,  obj.subjectID,'_',obj.runDate];
+            if exist(pathName_SD,'dir') == 0 % if path does not exist
+                success = mkdir(pathName_SD);
+                if ~success
+                    error('Unable to create new Experiment Directory: pathName_SD.')
+                end
+                addpath(genpath(pathName_SD)) % add all directories and subdirectories
+            end
+
+            % subject ID + Date Folder + text + run -----------------------------
+            % now find the next run number and create the folder
+            runCounter = 1;
+            done = 0;
+            while done == 0
+                pathName_SDTr = [pathName_SD,obj.sep,  obj.subjectID,'_',obj.runDate,'_',obj.experimentID,num2str(runCounter)];
+                %pathName = [obj.map.data,  obj.subjectID,obj.sep,  obj.subjectID,'_',obj.runDate,obj.sep,  obj.subjectID,'_',obj.runDate,'_',obj.experimentID,num2str(runCounter)];
+                if exist(pathName_SDTr,'dir') == 0 % if path does not exist
+                    obj.experimentID = [obj.subjectID,'_',obj.runDate,'_',obj.experimentID,num2str(runCounter)];
+                    %pathName = [obj.map.data,  obj.subjectID,obj.sep,  obj.runDate,obj.sep,  obj.experimentID];
+                    success = mkdir(pathName_SDTr);
+                    obj.savingGrace = [pathName_SDTr,obj.sep]; % where to save all the data to in current experiment
+                    done = 1;
+                end
+                if done==1 && ~success
+                    error('Unable to create new Experiment Directory.')
+                end
+                runCounter = runCounter + 1;
+                if runCounter > 1000
+                    done = 1;
+                    error('Too many runs present in this folder (>1000)')
                 end
             end
-        else
-            uiwait(errordlg('Experiment ID cannot be an empty string.','Experiment ID Error','modal'))
-            return
+            addpath(genpath([pathName_SDTr,obj.sep])) % add all directories and subdirectories
+            % set the button to verify mode
+            obj.h_expBox.String = obj.experimentID;
+            obj.h_enterSubjID.String = 'RUN';
+            obj.h_enterSubjID.BackgroundColor = [0 1 0];
+            obj.h_enterSubjID.Tag = '1';
+        elseif strcmp(obj.h_enterSubjID.Tag,'1') % if in the "verify" stage
+            % set the button back to "get" stage
+            obj.h_enterSubjID.String = 'Enter ID';
+            obj.h_enterSubjID.BackgroundColor = [1 1 0];
+            obj.h_enterSubjID.Tag = '0';
+            % if the ID input is all good, the following lines will execute
+            obj.subjID_OK = 1;
+            delete(obj.h_subjID)
         end
-        opID = get(obj.h_opBox,'String');
-        if ~isempty(opID)
-           obj.operatorID = opID;
-        else
-            uiwait(errordlg('Operator Initials cannot be an empty string.','Operator ID Error','modal'))
-            return
-        end
-        % if the ID input is all good, the following lines will execute
-        obj.subjID_OK = 1;
-        delete(obj.h_subjID)
     end    
     function printError(varargin)
         obj = varargin{1};
@@ -1312,3 +1396,67 @@ methods
 end
 end
 
+% OLD CODE
+%         if ~isempty(expID)
+%             d = dir(obj.map.data);
+%             N = length(d);
+%             match = 0;
+%             for ii=3:N % look to see if experiment folder already exists
+%                 if d(ii).isdir
+%                     if strcmp(d(ii).name,expID)
+%                         match = 1;
+%                     end
+%                 end
+%                 if match == 1
+%                     break
+%                 end
+%             end
+%             if match
+%                 obj.experimentID = expID;
+%             else
+%                 button = questdlg(['Experiment ID does not exist. Create new directory?'],...
+%                     'Create Experiment Directory','Yes','No','No');
+%                 if strcmp(button,'No')
+%                     return
+%                 else
+%                     success = mkdir(obj.map.data,expID);
+%                     if success
+%                         addpath([obj.map.data,expID])
+%                         obj.experimentID = expID;
+%                     else
+%                         error('Unable to create new Experiment Directory.')
+%                     end
+%                 end
+%             end
+%             d = dir([obj.map.data,expID]);
+%             N = length(d);
+%             match = 0;
+%             for ii=3:N % look for existing subject ID
+%                 if d(ii).isdir
+%                     if strcmp(d(ii).name,obj.subjectID)
+%                         match = 1;
+%                     end
+%                 end
+%                 if match == 1
+%                     break
+%                 end
+%             end
+%             if ~match
+%                 success = mkdir([obj.map.data,expID],obj.subjectID);
+%                 pathName = [obj.map.data,expID,obj.sep,obj.subjectID];
+%                 addpath(pathName)
+%                 if ~success
+%                     error('Unable to create directory for subject ID.')
+%                 end
+%             end
+%         else
+%             uiwait(errordlg('Experiment ID cannot be an empty string.','Experiment ID Error','modal'))
+%             return
+%         end
+%         opID = get(obj.h_opBox,'String');
+%         if ~isempty(opID)
+%            obj.operatorID = opID;
+%         else
+%             uiwait(errordlg('Operator Initials cannot be an empty string.','Operator ID Error','modal'))
+%             return
+%         end

@@ -29,9 +29,45 @@ function [stimScaled,scaling,errors] = ARLas_applyISC(isc,targetLvl,type,f,stim)
 % Updated: October 16, 2018
 % Updated: July 9, 2019 -- ssg & sb; major updates; included phase in both calibrations.
 % Updated: November 5, 2019 -- ssg; fixed some phase issues
+% Updated: July 7, 2021 -- ssg -- added capability for swept tones
+% Last Updated: August 12, 202 -- ssg -- fixed some potential errors due to 
+%                               zero in the frequency vector for swept tones
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    if length(f)==1 % if the stimulus is narrowband
+    if length(f)>2 % if the stimulus is a swept tone ---------------------------------
+        % get the full-out amplitude from the in-situ cal measurement
+        if strcmp(type,'spl')
+            fo = interp1(isc.freq,isc.spl,f,'pchip');
+            phi = interp1(isc.freq,isc.splPhi,f,'pchip');
+        elseif strcmp(type,'fpl')
+            fo = interp1(isc.freq,isc.fpl,f,'pchip');
+            phi = interp1(isc.freq,isc.fplPhi,f,'pchip');
+        elseif strcmp(type,'rpl')
+            fo = interp1(isc.freq,isc.rpl,f,'pchip');
+            phi = interp1(isc.freq,isc.rplPhi,f,'pchip');
+        elseif strcmp(type,'ipl')
+            fo = interp1(isc.freq,isc.ipl,f,'pchip');
+            phi = interp1(isc.freq,isc.fplPhi,f,'pchip');
+            % ipl technically has no phase; here, we use fpl phase.
+        else
+            error('Unrecognized calibration type. Must be a string: spl, fpl, rpl, or ipl.')
+        end
+        d = targetLvl - fo; % calculate the dB difference between full out and desired (target) level
+        k = 10.^(d/20); % express dB difference as a linear multiplier
+        % added 8/12/2024 -- ssg -- fixes potential errors assocated with 0 Hz in frequency vector f
+        indx = find(f==0);
+        k(indx) = 0;
+        if any(k>1) % changed 8/12/2024 -- ssg --if k >= 1 % if cannot achieve target output because desired > than full out
+            k = 0; % set multiplier to zero
+            errors = d; % error is the dB amount that exceeds full out
+            warning('The requested dB value exceeds full out.')
+        else
+            errors = 0;
+        end
+        a = hilbert(stim); % create an analytic signal
+        stimScaled = real(a .* k.*exp(1i.*phi)); % scale and shift stimulus
+        scaling = k.*cos(phi)+1i.*k.*sin(phi);
+    elseif length(f)==1 % if the stimulus is narrowband ---------------------------------------------------
         % get the full-out amplitude from the in-situ cal measurement
         if strcmp(type,'spl')
             fo = interp1(isc.freq,isc.spl,f,'pchip');
@@ -62,7 +98,7 @@ function [stimScaled,scaling,errors] = ARLas_applyISC(isc,targetLvl,type,f,stim)
         stimScaled = real(a .* k*exp(1i*phi)); % scale and shift stimulus
         scaling = k*cos(phi)+1i*k*sin(phi);
         
-    else % the stimulus is broadband: create an inverse magnitude FIR filter 
+    else % the stimulus is broadband impulsive create an inverse magnitude FIR filter  ---------------------
         tau = 0.0015; % filter group delay (sec)
         L = round(tau*2 * isc.fs); % calculate filter order
         if mod(L,2)~=1 % ensure filter order is even
@@ -300,3 +336,10 @@ end
 %     end
 % end
 
+        % if doSmoothing == 1 % added 8/12/2024 -- ssg -- can turn on smoothing to compensate for noisy calibration
+        %     smHz = 100; % apply smoothing in 2 Hz steps
+        %     smPts = round(smHz / median(gradient(f))); % smoothing points
+        %     if smPts > 1
+        %         fo = meanSmoother(fo,smPts); % smooth fo
+        %     end
+        % end

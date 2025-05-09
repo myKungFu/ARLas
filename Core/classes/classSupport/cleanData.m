@@ -20,6 +20,7 @@ function [X,stim] = cleanData(X,fs,stim,header,cut1,cut2)
 % The University of Iowa
 % Author: Shawn Goodman
 % Date: October 16, 2018
+% Last Updated: July 5, 2021 -- ssg -- turned off display number of artifacts.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     [rows,cols] = size(X); % orignal size of the recording
@@ -38,7 +39,7 @@ function [X,stim] = cleanData(X,fs,stim,header,cut1,cut2)
     tolerance = 'moderate'; doPlot = 0; % perform artifact rejectioin
     rms = sqrt(mean(X.^2,1));
     [indx,nRejects] = AR(rms,tolerance,doPlot);
-    disp([num2str(nRejects),' artifacts'])
+    %disp([num2str(nRejects),' artifacts'])
     X = AR_engine(X,indx);
     stim = AR_engine(stim,indx);
     X = mean(X,2); % return mean    

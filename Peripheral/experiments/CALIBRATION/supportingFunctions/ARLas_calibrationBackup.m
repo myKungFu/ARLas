@@ -22,6 +22,8 @@ function [] = ARLas_calibrationBackup()
 %               \\calibrations
 %                   \\micCals
 %                   \\thevCals
+%                   \\LTCals
+%                   \\calChecks
 %           \\Data
 %
 %
@@ -29,7 +31,10 @@ function [] = ARLas_calibrationBackup()
 % Auditory Research Lab, Dept. of Comm. Sciences & Disorders, The University of Iowa
 % Auditory Physiology Lab, Dept. of Otolaryngology, Washington University School of Medicine, St. Louis
 % Date: October 13, 2019
-% Updated: October 13, 2019 -- ssg
+% Last Updated: October 13, 2019 -- ssg
+% Last Updated: March 15, 2022 -- ssg -- added LTCals and calChecks folders
+%                       Added March 15, 2022, ssg. No longer delete old contents. 
+%                       Now you have to do this by hand!!
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     OK = 1; % okay to continue
@@ -41,7 +46,7 @@ function [] = ARLas_calibrationBackup()
          '  This program will back up your existing calibrations by moving '
          '  the contents of C:\\myWork\\ARLas\\Peripheral\\calibrations'
          '  to C:\\myWork\\ARLas_oldCalibrations.'
-         '  After running this program, you will need to obtain new calibrations.'         
+         %'  After running this program, you will need to obtain new calibrations.'         
         };
     nn = size(alertTxt,1);
     for ii=1:nn
@@ -91,22 +96,48 @@ function [] = ARLas_calibrationBackup()
     if isempty(D) % if calibration folder does not exist in ARLas
         success = mkdir(base); % create it, along witht the two sub-folders (micCals and thevCals)
         if success ~= 1
-            error('calibrations folder does not exist and could not be created. Aborting program.')
+            error('calibrations folder does not exist and could not be created.')
         end
         addpath(genpath(base))
         
-        success = mkdir([base,'micCals']); % create backup folder
-        if success ~= 1
-            error('micCals folder does not exist and could not be created. Aborting program.')
+        try
+            success = mkdir([base,'micCals']); % create backup folder
+            if success ~= 1
+                warning('micCals folder does not exist and could not be created.')
+            end
+            addpath(genpath([base,'micCals']))
+        catch
         end
-        addpath(genpath([base,'micCals']))
         
-        success = mkdir([base,'thevCals']); % create backup folder
-        if success ~= 1
-            error('thevCals folder does not exist and could not be created. Aborting program.')
+        try
+            success = mkdir([base,'thevCals']); % create backup folder
+            if success ~= 1
+                warning('thevCals folder does not exist and could not be created.')
+            end
+            addpath(genpath([base,'thevCals']))
+        catch
         end
-        addpath(genpath([base,'thevCals']))
+        
+        try
+            success = mkdir([base,'LTCals']); % create backup folder
+            if success ~= 1
+                warning('thevCals folder does not exist and could not be created.')
+            end
+            addpath(genpath([base,'LTCals']))
+        catch
+        end
 
+        try
+            success = mkdir([base,'calChecks']); % create backup folder
+            if success ~= 1
+                warning('calChecks folder does not exist and could not be created.')
+            end
+            addpath(genpath([base,'calChecks']))
+        catch
+        end
+        
+        
+        
         D = dir(base);
     end
     
@@ -161,11 +192,60 @@ function [] = ARLas_calibrationBackup()
                 end
                 disp(' ')
             end
+            
+        elseif strcmp(D(ii).name,'LTCals') % copy this
+            status = copyfile([base,D(ii).name],[backupDir,backupFolder,D(ii).name]);
+            if status ~= 1
+                errorTxt = {'Backup copy of LTCals folder unsuccessful.'
+                     '  Required Action: Find the source of this error and fix it.'
+                     '  ARLas_calibrationBackup aborted.'
+                    };
+                nn = size(alertTxt,1);
+                for ii=1:nn
+                    cprintf([1,0,0],[alertTxt{ii},'\n']);
+                end
+                disp(' ')
+                return
+            else
+                alertTxt = {'LTCals folder successfully backed up.'
+                     ['  Contents of LTCals copied to ','C:\\myWork\\ARLas_oldCalibrations',sep,sep,backupFolder(1:end-1),'.']
+                    };
+                nn = size(alertTxt,1);
+                for ii=1:nn
+                    cprintf([0,.0,.4],[alertTxt{ii},'\n']);
+                end
+                disp(' ')
+            end
+        elseif strcmp(D(ii).name,'calChecks') % copy this
+            status = copyfile([base,D(ii).name],[backupDir,backupFolder,D(ii).name]);
+            if status ~= 1
+                errorTxt = {'Backup copy of calChecks folder unsuccessful.'
+                     '  Required Action: Find the source of this error and fix it.'
+                     '  ARLas_calibrationBackup aborted.'
+                    };
+                nn = size(alertTxt,1);
+                for ii=1:nn
+                    cprintf([1,0,0],[alertTxt{ii},'\n']);
+                end
+                disp(' ')
+                return
+            else
+                alertTxt = {'calChecks folder successfully backed up.'
+                     ['  Contents of calChecks copied to ','C:\\myWork\\ARLas_oldCalibrations',sep,sep,backupFolder(1:end-1),'.']
+                    };
+                nn = size(alertTxt,1);
+                for ii=1:nn
+                    cprintf([0,.0,.4],[alertTxt{ii},'\n']);
+                end
+                disp(' ')
+            end
         else
             warnTxt = {'ARLas_calibrationBackup has detected files or folders outside of the expected ARLas directory structure.'
                  '  Required Action:  Move all calibration files and sub-folders into one of the following:'
                  '           ...\\ARLas\\Peripheral\\calibrations\\micCals'
-                 '           ...\\ARLas\\Peripheral\\calibrations\\thevCals'                 
+                 '           ...\\ARLas\\Peripheral\\calibrations\\thevCals'
+                 '           ...\\ARLas\\Peripheral\\calibrations\\LTCals'     
+                 '           ...\\ARLas\\Peripheral\\calibrations\\calChecks'
                  '  ARLas_calibrationBackup has NOT successfully run.'
                 };
             nn = size(alertTxt,1);
@@ -177,7 +257,10 @@ function [] = ARLas_calibrationBackup()
         end
     end
     
-    
+return
+% Added March 15, 2022, ssg. No longer delete old contents. 
+% Now you have to do this by hand!!
+
     if OK == 1 % if successfully backed up, delete old contents -----------
         D = dir(base);
         D = D(~cellfun('isempty', {D.date}));

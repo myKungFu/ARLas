@@ -34,16 +34,16 @@ function [] = ARLas_calibrationRoutine_DW10x(varargin)
     testProbe = 'A';        % set to 'A' or 'B';
     cavityTemperature = 26; % 30.5 (C); read this off of the 10X and update as needed    
     fmin = 200;     % minimum frequency (Hz) over which to calculate fit
-    fmax = 32000;   % maximum frequency (Hz) over which to calculate fit
+    fmax = 20000;   % maximum frequency (Hz) over which to calculate fit
                             % NOTE: These are different from the stimulus chirp range.
                             % The above values allow you to perform a calibration over a sub-range of the
                             % frequencies that are in the calibration chirp, which always goes from 200-32000 Hz.
                             % In the 10x internal cavity, the calibration falls apart above 22000 Hz.
                             % In the small stainless tubes, the calibration is good up to 32000 Hz.
     doBackup = 1;   % turn on (1) and off (0) backup of calibration files.
-    doMicCal = 1;   % turn on (1) and off (0) microphone calibration.
+    doMicCal = 0;   % turn on (1) and off (0) microphone calibration.
     doThevCal = 1;  % turn on (1) and off (0) Thevenin calibration.
-    doVerify = 1;   % turn on (1) and off (0) verification of calibration.
+    doVerify = 0;   % turn on (1) and off (0) verification of calibration.
                     % NOTE: Thevenin calibrations must exist in order to do
                     % mic calibration. 
     doNew = 0; % new mic correction type. Does not work; use old (set to 0)
