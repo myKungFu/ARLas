@@ -23,7 +23,7 @@ Operating System
 ARLas was written for and tested on both Windows operating systems and Macintosh operating systems. It will run on both 32- and 64-bit operating systems. In theory, it should also be useable on Linux, but this has not been explicitly tested.  
 
 MATLAB
-ARLas is written using object oriented programming.  It was originally developed on and tested on MATLAB version 7.10.0 (R2010a).  Some slightly older versions may work, but much older versions may not, due to changes in the way MATLAB handles classes and objects.  The MATLAB signal processing toolbox must be installed in order to run ARLas. Both 32- and 64-bit versions of MATLAB will support ARLas.
+ARLas is written using object oriented programming.  It was originally developed on and tested on MATLAB version 24.1 (R2024a).  Some slightly older versions may work, but much older versions may not, due to changes in the way MATLAB handles classes and objects.  The MATLAB signal processing toolbox must be installed in order to run ARLas. Both 32- and 64-bit versions of MATLAB will support ARLas.
 
 Sound Card
 ARLas should be able to access any soundcard, including on-board cards, PCI-based cards, and external sound cards (connected using USB or Firewire).  Soundcards can be accessed through the playrec utility via different host API including ASIO, WMME and DirectSound (under Windows) and Core Audio (Macintosh).  
