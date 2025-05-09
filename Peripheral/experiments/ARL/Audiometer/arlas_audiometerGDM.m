@@ -57,7 +57,7 @@ classdef arlas_audiometerGDM < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 properties (SetAccess = private)
-    version = '22JAN2025';
+    version = '08MAY2025';
     sep % path delimiter appriate for the current operating system 
     map % struct containing file paths
     arlasObj % object that is the arlas object (not the audiometer object)
