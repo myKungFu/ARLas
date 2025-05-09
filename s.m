@@ -7,17 +7,19 @@ function [] = s()
 %
 % Author: Shawn Goodman
 % Date: April 25, 2013
+% Date: April 4, 2025 -- ssg -- updated to work with myWork2 instead of
+% myWork.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 format compact
 format short
-addpath(genpath(['C:\myWork\ARLas'])) % add all directories and subdirectories in myWork
+addpath(genpath(['C:\myWork2\ARLas'])) % add all directories and subdirectories in myWork
 % pathName = (['C:\myWork\ARLas\development']);
 % if exist(pathName,'dir'), % remove attic and subdirectories from the path
 %     p = myRemovePath(pathName);
 % end
 % rmpath(pathName)  
-cd('C:\myWork\ARLas')
+cd('C:\myWork2\ARLas')
 
 
 function p = myRemovePath(d)
