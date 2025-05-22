@@ -81,7 +81,7 @@ function [isc] = ARLas_earRecordings_ER10x(varargin)
     input.label = [input.label,'_inSituCal'];
     obj.setRecList(input.ch,input.label,input.micSens,input.gain); % load the recording info for ARLas to use
  
-% use reference mice for comparison
+% use reference mic for comparison
 %inputs = hardwareSetup;
 %obj.setRecList(inputs{3}.ch,inputs{3}.label,inputs{3}.micSens,inputs{3}.gain);    
     

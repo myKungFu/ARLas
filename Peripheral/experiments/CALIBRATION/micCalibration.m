@@ -22,8 +22,8 @@ function micCalibration(varargin)
 
     [inputs,outputs] = hardwareSetup;
     inputIHS = inputs{1}; % OAE probe IHS24 mic
-    inputRef = inputs{2}; % reference 1/4 inch condensor mic
-    inputPT = inputs{3}; % ER7 probe tube mic
+    inputRef = inputs{3}; % reference 1/4 inch condensor mic
+    inputPT = inputs{4}; % ER7 probe tube mic
     output = outputs{1}; % IHS24 loudspeaker
                          % NOTE: Here I am using the left channel (1) to
                          % play the chirp and the right channel shold be

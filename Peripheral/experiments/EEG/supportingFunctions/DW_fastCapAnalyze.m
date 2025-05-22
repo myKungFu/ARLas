@@ -1,0 +1,166 @@
+function [mag,nf,snr,freq,cap,time,stimulusSPL,phi,signal,noise,frequency] = DW_fastCapAnalyze(header,Data,audioSwitch)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% mag,nf,snr,freq,cap,time,stimulusSPL,phi,signal,noise,frequency] = DW_fastCapAnalyze(header,Data,audioSwitch);
+%
+% Analysis code for CAPs measured at mulitple frequencies and levels.
+% This code should be called by DW_fastCapAudio.m
+%
+% Authors: Shawn S Goodman, PhD & Jeffery T Lichtenhan PhD
+% Auditory Research Lab, Dept. of Comm. Sciences & Disorders, The University of Iowa
+% Auditory Physiology Lab, Dept. of Otolaryngology, Washington University School of Medicine, St. Louis
+% Date: August 14, 2019
+% Updated: August 15, 2019 - ssg
+% Updated: November 5, 2019 -- ssg; Added audioSwitch to analyze reference audio data.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if nargin <3
+    audioSwitch = 0; % set to 1 to analyze ER10X audio, rather than CAP recordings
+end
+% -------------------------------------------------------------------------
+
+% de-interleave the data
+sortIndx = header.userInfo.sortIndx;
+Data = Data(:,sortIndx);  % put data back into sorted order
+
+% unpack needed information from the header
+levels = header.userInfo.levels;
+freqs = header.userInfo.freqs;
+nReps = header.userInfo.nReps;
+stimSPL = header.userInfo.stimSPL;
+fs = header.fs;
+cuts = header.userInfo.cuts;
+%stimSL = stimSPL;
+
+% Analyze Data for each level and frequency.
+nLevels = length(levels); % number of levels tested
+nFreqs = size(freqs,2);   % number of frequencies tested
+nSamples = size(Data,1);  % number of samples in each recorded buffer
+counter = 1; 
+start = 1;
+
+for ii=1:nLevels
+    for jj=1:nFreqs
+        f = freqs(:,jj);              % current frequency
+        nn = nReps(ii,jj);          % number of recordings at this combintaion
+        finish = start + nn-1;
+        chunk = Data(:,start:finish);
+        if nn > 0                     % if data were actually recorded at this level and frequency combination
+            nSubs = size(chunk,2)/6;  % number of sub-averages to perform. Always in sets of 6 to cancel electrical artifact
+            step2 = 6;
+            start2 = 1;
+            finish2 = step2;
+            counter2 = 1;
+            chunk2 = zeros(nSamples,nSubs);
+            for kk=1:nSubs           % loop to create sub-averages
+                chunk2(:,counter2) = mean(chunk(:,start2:finish2),2);
+                start2 = start2 + step2;
+                finish2 = finish2 + step2;
+                counter2 = counter2 + 1;
+            end
+            % this is the new way; it uses Fourier-based RMS magnitudes
+            if audioSwitch == 0
+                [Cap,time] = getCAP(chunk2,cuts,fs);
+                [mag(1,counter),nf(1,counter),snr(1,counter),phi(1,counter),cap(:,counter),signal(:,counter),noise(:,counter),frequency] = DW_capAnalysis(Cap,time,fs);
+                freq(:,counter) = f;
+                %stimulusSL(1,counter) = stimSL(ii,jj);   % stimulus sensation level
+                stimulusSPL(1,counter) = stimSPL(ii,jj); % stimulus sound pressure level
+            else
+                q = chunk2;
+                q1 = q(cuts(1,1):cuts(1,2),:);
+                q2 = q(cuts(2,1):cuts(2,2),:);
+                q = [q1,-q2];
+                len = 0.001;
+                q = ARLas_ramp(q,fs,len);
+                if audioSwitch == 1 % for pip audio
+                    [fff,signal,noiseFloor,phase] = ARLas_fda(q,fs,0.00002,fs);
+                    [~,indx] = min(abs(fff-f));
+                    mag(ii,jj) = signal(indx);
+                    phi(ii,jj) = phase(indx);
+                    nf(ii,jj) = noiseFloor(indx);
+                    freq(1,counter) = f;
+                    stimulusSPL(1,counter) = stimSPL(ii,jj);
+                    snr(ii,jj) = mag(ii,jj) - nf(ii,jj);
+                elseif audioSwitch == 2 % for click audio
+                    mag(ii,jj) = 20*log10(max(abs((mean(q,2))))/.00002);
+                    phi(ii,jj) = nan;
+                    nf(ii,jj) = nan;
+                    freq(:,counter) = f;
+                    stimulusSPL(1,counter) = stimSPL(ii,jj);
+                    snr(ii,jj) = nan;
+                    
+                    if stimSPL(ii,jj) == -15
+                        [fff,signal,noiseFloor,phase] = ARLas_fda(q,fs,0.00002);
+                        %figure
+                        plt(fff,signal)
+                        hold on
+                        plt(fff,noiseFloor)
+                        %keyboard
+                    end
+                    
+                end
+                
+                cap = [];
+                time = [];
+                signal = [];
+                noise = [];
+                frequency = [];
+            end
+            counter = counter + 1;
+            start = finish + 1;
+        end
+    end
+end
+end % EOF: end of experiment file
+
+% INTERNAL FILES ----------------------------------------------------------
+function [Cap,time] = getCAP(chunk2,cuts,fs)
+    D1 = chunk2(cuts(1,1):cuts(2,1)-1,:); % pip
+    D2 = chunk2(cuts(2,1):end,:);         % invertd pip
+    Cap = (D1 + D2)/2;                  % compound action potential
+    Cap = Cap * 1000000; % cap in uV
+    nSamples = size(Cap,1);           % number of samples in each response
+    time = (0:1:nSamples-1)'/fs;      % time vector associated with each CAP waveform
+    time = time *1000;                % time in ms                
+end
+            
+function b = lpf(fs,Fpass) % lowpass filter coefficients
+    Fstop = 1.7 * Fpass;    % Stopband Frequency
+    Dpass = 0.057501127785;  % Passband Ripple
+    Dstop = 0.0001;          % Stopband Attenuation
+    flag  = 'scale';         % Sampling Flag
+    [N,Wn,BETA,TYPE] = kaiserord([Fpass Fstop]/(fs/2), [1 0], [Dstop Dpass]);
+    if mod(N,2)~= 0
+        N = N + 1;
+    end
+    b  = fir1(N, Wn, TYPE, kaiser(N+1, BETA), flag)';
+end
+
+% OLD CODE
+%snrAdj = snr;
+%snrAdj(snrAdj<0) = 0; % adjusted snr does not allow snr to be less than 0 dB
+%criterion = 6; % 6 dB SNR criterion must be exceeded to say that cap is present
+%present = snr > criterion;
+
+
+% % prepare analyzed data for plotting
+% F = unique(freq); % get the unique frequency values
+% nF = length(F);   % number of unique frequencies tested
+% % find the larges number of stimulus levels for any frequency
+% for ii=1:nF
+%    indx = find(freq==F(ii));
+%    nVals(ii) = length(indx);
+% end
+% nL = max(nVals); % max number of stimulus levels tested
+% P2P = nan(nL,nF); % initialize output matrix
+% LVL = nan(nL,nF); % initialize output matrix
+% for ii=1:nF
+%    indx = find(freq==F(ii));
+%    for jj=1:length(indx)
+%        P2P(jj,ii) = mag(indx(jj));
+%        NF(jj,ii) = nf(indx(jj));
+%        LVL(jj,ii) = stimulusSPL(indx(jj));
+%    end
+% end
+% FF = repmat(F,nL,1);
+% offset = linspace(0,500,nL)';
+

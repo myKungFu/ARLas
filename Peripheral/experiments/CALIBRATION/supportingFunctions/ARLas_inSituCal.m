@@ -35,6 +35,7 @@ function [isc] = ARLas_inSituCal(obj,recording,stimulus)
 % isc.splPhi = unwrapped phase for spl
 % isc.fplPhi = unwrapped phase for fpl
 % isc.rplPhi = % unwrapped phase for rpl
+% isc.eplCorrection = correction; % epl correction (multiply SPL by this)
 %
 % Auditory Research Lab, The University of Iowa
 % Deptartment of Communication Sciences & Disorders
@@ -43,6 +44,7 @@ function [isc] = ARLas_inSituCal(obj,recording,stimulus)
 % Date: December 1, 2017
 % Updated: October 16, 2018
 % Updated: July 9, 2019 -- ssg & sb; added phase outputs
+% Updated: May 21, 2025 -- ssg -- added epl correction as an output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 N = length(stimulus);
@@ -104,11 +106,11 @@ isc.RL = RL;         % Load reflectance
 isc.splPhi = splPhi; % unwrapped phase for spl
 isc.fplPhi = fplPhi; % unwrapped phase for fpl
 isc.rplPhi = rplPhi; % unwrapped phase for rpl
+isc.eplCorrection = correction; % epl correction (multiply SPL by this)
 
 end
 
 % internal functions ------------------------------------------------------
-
 function [z0,diam] = getZ0(obj,ZL)
     % Use "surge" method to estimate surge impedance and cavity diameter:
     minFreq = obj.fmin * 1.25; % use the lowest possible frequency, plus 25%
@@ -141,7 +143,6 @@ function [z0,diam] = getZ0(obj,ZL)
     % xlim([54,400])
     % pause(.5)
 end
-
 function diam = getDiameter(z0)
     % get cavity diameter, based on calcualted surge impedance (z0)
     a = 1.219;  

@@ -12,7 +12,7 @@ obj = varargin{1}; % get the arlas object
     probeR = 'A'; % probe that is in RIGHT ear; 'A', 'B', or []
                   % Note: Either one or both ears can be tested at the same time.
                   % If either probe is empty set, will not be tested. 
-    subjAge = 37;
+    subjAge = 27;
     % freqs = [];
 % -------------------------------------------------------------------------                  
 

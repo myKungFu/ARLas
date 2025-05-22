@@ -106,7 +106,7 @@ function [pl,Pl,phi,other,wf] = ARLas_convertPL(X,isc)
     ipl = 20*log10(IPL/pRef);
     cc =  3.493338665700000e+04; % speed of sound in air
     [correction,canalLength,Fqw,RS,RL] = getEPL(z0,ZS,ZL,ipl,spl,freq,cc);
-    EPL = mean(SPLraw,2) .* correction; % emission pressure level
+    EPL = mean(SPLraw,2) .* correction; % emitted pressure level
      
 % -----    
     EPL = smoother(freq,EPL,SPL);

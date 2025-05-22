@@ -15,41 +15,51 @@ function [inputs,outputs] = hardwareSetup()
 %       settings; used with updated ARLas version to display reminder message
 %       about output limiter.
 % Last Updated: April 4, 2025 -- ssg -- updated for IHS system. There is no
-% output limiter. Also changed in arlas class so always set to zero.
+%       output limiter. Also changed in arlas class so always set to zero.
+% Last Updated: May 20, 2025 -- ssg -- updated to save a place for IHS
+%       probes A and B (inputs and outputs 1 and 2, respectively).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% NOTES for goodman ARL:
-
-% INPUTS USED: 
-% ER10XA input = ch 3
-% ER10XB input = ch 4
-% Optiamp input = ch 7 & 8
-
-% OUTPUTS USED:
-% ER10XA output = 3,4
-% ER10XA output = 5,6
 
 % Specify Inputs -------------------------------------------------------------------------
-    inputs{1}.label = 'OP24'; % IHS OP24 extended bandwidth probe mic
+    inputs{1}.label = 'OP24A'; % IHS OP24 extended bandwidth probe mic ("A" probe)
     inputs{1}.micSens = 0.5;   % sensitivity in V/Pa
     inputs{1}.gain = 0;        % amplifier gain in dB
     inputs{1}.ch = 1;           % input channel being used on the sound card
 
-    inputs{2}.label = '250118'; % G.R.A.S 1/8" Pressure Mic, Type 40DP
-    inputs{2}.micSens =0.00088; % sensitivity in V/Pa (shawns)
-    inputs{2}.gain = 0;         % amplifier gain in dB
-    inputs{2}.ch = 2;           % input channel on the sound card    
+    inputs{2}.label = 'OP24B'; % IHS OP24 extended bandwidth probe mic ("B" probe)
+    inputs{2}.micSens = 0.5;   % sensitivity in V/Pa
+    inputs{2}.gain = 0;        % amplifier gain in dB
+    inputs{2}.ch = [];           % input channel being used on the sound card -- NOT CURRENTLY USED!
 
-    inputs{3}.label = 'ER7C';   % ER7C probe Mic
-    inputs{3}.micSens = 0.05; % sensitivity in V/Pa
+    inputs{3}.label = '250118'; % G.R.A.S 1/8" Pressure Mic, Type 40DP
+    inputs{3}.micSens =0.00088; % sensitivity in V/Pa (shawns)
     inputs{3}.gain = 0;         % amplifier gain in dB
-    inputs{3}.ch = 6;           % input channel on the sound card        
+    inputs{3}.ch = 2;           % input channel on the sound card    
+
+    inputs{4}.label = 'ER7C';   % ER7C probe Mic
+    inputs{4}.micSens = 0.05; % sensitivity in V/Pa
+    inputs{4}.gain = 0;         % amplifier gain in dB
+    inputs{4}.ch = 6;           % input channel on the sound card        
     
 % Specify Outputs  -------------------------------------------------------------------------
-    outputs{1}.label = 'OP24';  % IHS OP24 extended bandwdith loudspeakers
+    outputs{1}.label = 'OP24A';  % IHS OP24 extended bandwdith loudspeakers ("A" probe)
     outputs{1}.ch = [1,2];      % output channel(s) on the sound card
 
+    outputs{2}.label = 'OP24B';  % IHS OP24 extended bandwdith loudspeakers ("B" probe)
+    outputs{2}.ch = [];      % output channel(s) on the sound card -- NOT CURRENTLY USED!
+
+
 % OLD CODE ----------------------------------------------------------------
+% NOTES for goodman ARL:
+% INPUTS USED: 
+% ER10XA input = ch 3
+% ER10XB input = ch 4
+% Optiamp input = ch 7 & 8
+% OUTPUTS USED:
+% ER10XA output = 3,4
+% ER10XA output = 5,6
+
 
     % outputs{1}.label = 'ER10xA';% not used, but saved for reference
     % outputs{1}.ch = [3,4];      % output channel(s) on the sound card

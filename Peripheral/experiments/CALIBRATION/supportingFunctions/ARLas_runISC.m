@@ -49,13 +49,13 @@ function [iscS1,iscS2,iscS12] = ARLas_runISC(obj,probeInput,probeOutput,calPath1
             if doIndividual == 1 % calibrate the output of each channel individually
                 po = probeOutput; % hack to make this work each output channel separately
                 po.ch = probeOutput.ch(1);
-                iscS1 = ARLas_earRecordings_ER10x(obj,probeInput,po,[calPath1.pathName,calPath1.folderName],calPath1.fileName,params); 
+                iscS1 = ARLas_earRecordings_IHS(obj,probeInput,po,[calPath1.pathName,calPath1.folderName],calPath1.fileName,params); 
                 po.ch = probeOutput.ch(2);
-                iscS2 = ARLas_earRecordings_ER10x(obj,probeInput,po,[calPath2.pathName,calPath2.folderName],calPath2.fileName,params); 
+                iscS2 = ARLas_earRecordings_IHS(obj,probeInput,po,[calPath2.pathName,calPath2.folderName],calPath2.fileName,params); 
             end
             if doSimultaneous == 1 % calibrate the output for both channels presented simultaneously
                 po = probeOutput; 
-                iscS12 = ARLas_earRecordings_ER10x(obj,probeInput,po,[calPath1.pathName,calPath1.folderName],calPath1.fileName,params); 
+                iscS12 = ARLas_earRecordings_IHS(obj,probeInput,po,[calPath1.pathName,calPath1.folderName],calPath1.fileName,params); 
             end                
         else
             iscS1 = [];

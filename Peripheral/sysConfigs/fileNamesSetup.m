@@ -18,12 +18,12 @@ function [fileName] = fileNamesSetup(expName)
 
     % List the known experiment names and their preferred associated file names
     try
-        if contains(expName,'fixedRatioDiscrete')
-            fileName = 'dpoaeDiscrete';
-        elseif contains(expName,'fixedL1Sweep')
-            fileName = 'dpoaeLGFsweep';
-        elseif contains(expName,'fixedRatioSweep')
-            fileName = 'dpoaeGramSweep';
+        if contains(expName,'LGF')
+            fileName = 'dpoae_LGF';
+        elseif contains(expName,'LRF')
+            fileName = 'dpoae_LRF';
+        elseif contains(expName,'DPgram')
+            fileName = 'dpoae_DPgram';
         elseif contains(expName,'memr')
             fileName = 'memr';
         elseif contains(expName,'audio')

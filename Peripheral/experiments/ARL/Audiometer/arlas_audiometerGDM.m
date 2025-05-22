@@ -223,35 +223,9 @@ properties (SetAccess = public)
     startingLvls_L % starting test levels for each frequency, given age
     startingLvls_R
     audiogramData
+    LC % load calibration
 end
 methods
-    
-    function keyPressHandler(obj, event)
-        switch event.Key
-            case 'uparrow'
-                obj.lvlUpManager(obj.h_lvlUp, []);
-            case 'downarrow'
-                obj.lvlDnManager(obj.h_lvlDn, []);
-            case 'rightarrow'
-                obj.freqUpManager(obj.h_freqUp, []);
-            case 'leftarrow'
-                obj.freqDnManager(obj.h_freqDn, []);
-            case 'space'
-                obj.presentManager(obj.h_present, []);
-            case 'y'
-                obj.doYes(obj.h_respYES, []);
-            case 'n'
-                obj.doNo(obj.h_respNO, []);
-            case 'shift'
-            obj.toggleStepSize(obj.STEP, []);
-            case 'v'
-            newVal = ~obj.h_switchPlots.Value;
-            obj.h_switchPlots.Value = newVal;
-            obj.doSwitch(obj.h_switchPlots, []);
-            
-            % Add more keys if needed here Shawn
-        end
-    end
 
     function obj = arlas_audiometerGDM(subjID,subjAge,arlasObj,probeL,probeR,freqs) % initialize object of class initARLas
         if nargin >= 5 % if being called from ARLas (to collect real data)
@@ -295,7 +269,7 @@ methods
             obj.calFinished = 1;
             obj.dBConversionL = ones(size(freqs))*6;
             obj.dBConversionR = ones(size(freqs))*6;
-       end
+        end
         obj.freqs = freqs(:)';
         obj.nFreqs = length(obj.freqs);
         [~,obj.fIndx] = min(abs(freqs - 1000)); % initialize to frequency closest to 1 kHz
@@ -593,6 +567,32 @@ methods
             obj.printError(ME)
         end
     end    
+    function keyPressHandler(obj, event)
+        switch event.Key
+            case 'uparrow'
+                obj.lvlUpManager(obj.h_lvlUp, []);
+            case 'downarrow'
+                obj.lvlDnManager(obj.h_lvlDn, []);
+            case 'rightarrow'
+                obj.freqUpManager(obj.h_freqUp, []);
+            case 'leftarrow'
+                obj.freqDnManager(obj.h_freqDn, []);
+            case 'space'
+                obj.presentManager(obj.h_present, []);
+            case 'y'
+                obj.doYes(obj.h_respYES, []);
+            case 'n'
+                obj.doNo(obj.h_respNO, []);
+            case 'shift'
+                obj.toggleStepSize(obj.STEP, []);
+            case 'v'
+                newVal = ~obj.h_switchPlots.Value;
+                obj.h_switchPlots.Value = newVal;
+                obj.doSwitch(obj.h_switchPlots, []);
+            otherwise
+                % Add more keys if needed here Shawn
+        end
+    end
     function buttonManager(varargin) % change colors and states of buttons on bottom bar
         obj = varargin{1};
         try
@@ -1031,6 +1031,22 @@ methods
                 pause(flickerLen)
             end            
         end
+        if obj.levels(obj.lvlIndx) > obj.maxOutput(obj.fIndx) % can't go higher than max output
+            [~,indx] = min(abs(obj.maxOutput(obj.fIndx) - obj.levels));
+            obj.lvlIndx = indx;
+            if obj.levels(obj.lvlIndx) > obj.maxOutput(obj.fIndx)
+                obj.lvlIndx = obj.lvlIndx - 1;
+            end
+            
+            flickerLen = 0.1; % length of flicker for error notification
+            flickerReps = 5; % number of flickers
+            for ii=1:flickerReps
+                set(obj.h_lvlUp,'Value',1,'Tag','on','CData',imread('lvlUpRed.jpg'))
+                pause(flickerLen)
+                set(obj.h_lvlUp,'Value',1,'Tag','on','CData',imread('lvlUpGreen.jpg'))
+                pause(flickerLen)
+            end            
+        end
         obj.lvlNow = obj.levels(obj.lvlIndx);
         obj.LVL.String = [num2str(obj.lvlNow),' dB ',char(obj.refNow)];
         
@@ -1138,111 +1154,22 @@ methods
         obj.buttonManager(10)
         set(obj.h_cal,'Value',0,'Tag','off','BackgroundColor',[0 1 0])
         
+        % Get most recent cal file
         ao = obj.arlasObj; % ao is the arlas object (as opposed to the audiometer object)
-        probeL = obj.probeL;
-        probeR = obj.probeR;
-        doMicCorrection = obj.doMicCorrection;
+        LC = getMostRecentLoadCalibration(ao);        
+        obj.LC = LC;
+        probeL = LC.probeA;
+        probeR = LC.probeB;
+        doMicCorrection = LC.doMicCorrection;
+        obj.iscS1L = LC.iscSA1;
+        obj.iscS2L = LC.iscSA2;
+        obj.iscS1R = LC.iscSB1;
+        obj.iscS2R = LC.iscSB2;
+        obj.probeInputL = LC.probeInputA;
+        obj.probeInputR = LC.probeInputB;
+        obj.probeOutputL = LC.probeOutputA;
+        obj.probeOutputR = LC.probeOutputB;
 
-        % specify calibration to use to set stimulus levels
-        calType = 'thev'; % use 'thev' for Thevenin source
-        targetCalType = char(obj.refNow); % 'fpl', 'spl', 'ipl'.
-        ISCL = struct;
-        ISCR = struct;
-        if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
-            testProbe = 'Both';
-        elseif ~(isempty(probeL))
-            testProbe = 'Left';
-        elseif ~(isempty(probeR))
-            testProbe = 'Right';
-        end
-        
-        if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
-            testEar = 'Both';
-        else
-            % Get stimulus ear:
-            prompt = {'Enter the test ear (Left or Right)'};
-            title = 'Test Ear'; 
-            defaultAns = {'Right'};
-            numlines = 1;
-            answer = inputdlg(prompt,title,numlines,defaultAns);        
-            if isempty(answer) % user hit cancel
-                return
-            elseif strcmp(answer{1},'') % if user left field blank
-                return
-            else % user put something in the field
-                % check for legal input
-                testEar = answer{1}; % voltage rms must be positive
-                if strcmp(testEar,'left')
-                    testEar = 'Left';
-                end
-                if strcmp(testEar,'right')
-                    testEar = 'Right';
-                end
-                if ~(strcmp(testEar,'Left') | strcmp(testEar,'Right'))
-                    disp('Error: Invalid input. Must be Left or Right.')
-                    return
-                end
-            end
-        end
-        
-        % get probe settings
-        validateStimLevels = [];
-        [probeInputL,probeOutputL,probeInputR,probeOutputR,~] = getProbeSettings(probeL,probeR,validateStimLevels);
-        % get most recent calibration files -----
-        if isempty(obj)
-            tempobj = struct;
-            tempobj.map = [];
-        else
-            tempobj = obj;
-        end    
-        micCorrectionL = getMicCorrection(probeInputL,doMicCorrection,tempobj.map);
-        micCorrectionR = getMicCorrection(probeInputR,doMicCorrection,tempobj.map);
-        if doMicCorrection==1
-            if ~isempty(probeInputL)
-                if micCorrectionL == 1
-                    warning('MIC CORRECTION IS NOT BEING APPLIED!')
-                end
-            end
-            if  ~isempty(probeInputR)
-                if micCorrectionR == 1
-                    warning('MIC CORRECTION IS NOT BEING APPLIED!')
-                end
-            end
-        end
-        [C1L,C2L,calPath1L,calPath2L] = getOutputCal(calType,probeOutputL,tempobj.map);
-        [C1R,C2R,calPath1R,calPath2R] = getOutputCal(calType,probeOutputR,tempobj.map);
-        
-        % PERFORM IN-SITU CALIBRATION -----
-        fmin = 100;
-        fmax = 18000;
-        disp('----- Running in-situ calibration -----')
-        inSituReps = 6;
-        doIndividual = 1;
-        doSimultaneous = 0;
-        if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
-            [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
-            [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
-        elseif ~(isempty(probeL))
-            [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
-            iscS1R = [];
-            iscS2R = [];
-        elseif ~(isempty(probeR))
-            [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
-            iscS1L = [];
-            iscS2L = [];
-        end
-        % [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
-        % [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
-        % 
-        % these strucures will be used to apply the in-situ calibration
-        obj.iscS1L = iscS1L;
-        obj.iscS2L = iscS2L;
-        obj.iscS1R = iscS1R;
-        obj.iscS2R = iscS2R;
-        obj.probeInputL = probeInputL;
-        obj.probeInputR = probeInputR;
-        obj.probeOutputL = probeOutputL;
-        obj.probeOutputR = probeOutputR;
 
         % Get the clicker information (for auto mode only)
         % [inputs,outputs] = hardwareSetup; % read in the hardware setup
@@ -1263,7 +1190,6 @@ methods
         %     end
         % end
 
-        disp('----- Finished in-situ calibration -----')
         % get IPL conversions for left ear
         if obj.whichLoudspeaker == 1
             iscNow = obj.iscS1L;
@@ -1305,23 +1231,48 @@ methods
             obj.audiogramData.iscS2L = obj.iscS2L;
             obj.audiogramData.iscS1R = obj.iscS1R;
             obj.audiogramData.iscS2R = obj.iscS2R;
-            %obj.audiogramData.probeOutput = obj.probeOutput;
-            %obj.audiogramData.probeOutputR = obj.probeOutputR;
-            %obj.audiogramData.probeInputL = obj.probeInputL;
-            %obj.audiogramData.probeInputR = obj.probeInputR;
-            obj.audiogramData.micCorrectionL = obj.micCorrectionL;
-            obj.audiogramData.micCorrectionR = obj.micCorrectionR;
-            obj.audiogramData.C1L = obj.C1L;
-            obj.audiogramData.C2L = obj.C2L;
-            obj.audiogramData.C1R = obj.C1R;
-            obj.audiogramData.C2R = obj.C2R;
-            obj.audiogramData.probeR = obj.probeR;
-            obj.audiogramData.probeL = obj.probeL;
-            obj.audiogramData.doMicCorrection = obj.doMicCorrection;
+
+            obj.audiogramData.micCorrectionL = LC.micCorrectionA;
+            obj.audiogramData.micCorrectionR = LC.micCorrectionB;
+            obj.audiogramData.C1L = LC.CA1;
+            obj.audiogramData.C2L = LC.CA2;
+            obj.audiogramData.C1R = LC.CB1;
+            obj.audiogramData.C2R = LC.CB2;
+            obj.audiogramData.probeL = LC.probeA;
+            obj.audiogramData.probeR = LC.probeB;
+            obj.audiogramData.doMicCorrection = LC.doMicCorrection;
             obj.audiogramData.whichLoudspeaker = obj.whichLoudspeaker; % most probes have 2 loudspeakers--which one are you using (1 or 2)
             obj.audiogramData.dBConversionL = obj.dBConversionL; % conversion factor to make FPL into IPL (in dB)
             obj.audiogramData.dBConversionR = obj.dBConversionR;
-            
+
+            % set maxOutput
+            if ~isempty(LC.iscSA1)
+                if obj.whichLoudspeaker == 1
+                    isc = LC.iscSA1;
+                elseif obj.whichLoudspeaker == 2
+                    isc = LC.iscSA2;
+                end
+            elseif ~isempty(LC.iscSB1)
+                if obj.whichLoudspeaker == 1
+                    isc = LC.iscSB1;
+                elseif obj.whichLoudspeaker == 2
+                    isc = LC.iscSB2;
+                end
+            else
+                error('Unrecognized loudspeaker choice')
+            end
+            if strcmp(string(obj.refNow),'FPL')
+                fo = isc.fpl;
+            elseif strcmp(string(obj.refNow),'IPL')
+                fo = isc.ipl;
+            else
+                error('Unrecognized reference choice')
+            end
+            for ii=1:length(obj.freqs)
+                [~,indx] = min(abs(obj.freqs(ii) - LC.iscSA1.freq));
+                maxOut(1,ii) = LC.iscSA1.fpl(indx);
+            end
+            obj.maxOutput = maxOut;
         end
         figure(obj.H)
         obj.buttonManager(20)
@@ -1564,8 +1515,15 @@ methods
         set(obj.h_respYES,'Value',0,'Tag','off','BackgroundColor',[.7 .7 .7])
         set(obj.h_respNO,'Value',0,'Tag','off','BackgroundColor',[.7 .7 .7])
     end
+    function toggleStepSize(obj, src, ~)
+        % Toggle the step size button
+        currentStep = str2double(src.String);
+        newStep = obj.stepSizes(obj.stepSizes ~= currentStep); % switch to the other value
+        src.String = num2str(newStep); % update button label
+        obj.stepManager(newStep); % Calling stepManager here
+    end
 
-    % define supporting functions
+    % define supporting functions -----------------------------------------
     function getStim(varargin) % create the stimuli
         obj = varargin{1};
         % Pulsed tones, per ANSI S3.6-2004
@@ -1678,7 +1636,7 @@ methods
             targetCalType = 'ipl';
         end
         
-        [s1,~,~] = ARLas_applyISC(obj.iscNow,obj.lvlNow+3,targetCalType,obj.freqNow,stim(:));
+        [s1,~,~] = ARLas_applyISC(obj.iscNow,obj.lvlNow,targetCalType,obj.freqNow,stim(:));
         obj.stimNow = reshape(s1,rows,cols);
     end
     function prepStim(varargin) % get the current stimulus and fold it for presentation efficiency
@@ -2367,16 +2325,6 @@ methods
         end
         obj.startingLvls_R = obj.startingLvls_L;
     end
-    
-    function toggleStepSize(obj, src, ~)
-    % Toggle the step size button
-    currentStep = str2double(src.String);
-    newStep = obj.stepSizes(obj.stepSizes ~= currentStep); % switch to the other value
-    src.String = num2str(newStep); % update button label
-
-    % Calling stepManager here
-    obj.stepManager(newStep);
-    end
 end
 end
 
@@ -2447,3 +2395,119 @@ end
     %         micCorrection = 1; % convolving by this changes nothing
     %     end
     % end
+
+    % Old code for cal
+
+        
+% 
+% probeL = obj.probeL;
+% probeR = obj.probeR;
+% doMicCorrection = obj.doMicCorrection;
+% 
+% % specify calibration to use to set stimulus levels
+% calType = 'thev'; % use 'thev' for Thevenin source
+% targetCalType = char(obj.refNow); % 'fpl', 'spl', 'ipl'.
+% ISCL = struct;
+% ISCR = struct;
+% if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
+%     testProbe = 'Both';
+% elseif ~(isempty(probeL))
+%     testProbe = 'Left';
+% elseif ~(isempty(probeR))
+%     testProbe = 'Right';
+% end
+% 
+% if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
+%     testEar = 'Both';
+% else
+%     % Get stimulus ear:
+%     prompt = {'Enter the test ear (Left or Right)'};
+%     title = 'Test Ear'; 
+%     defaultAns = {'Right'};
+%     numlines = 1;
+%     answer = inputdlg(prompt,title,numlines,defaultAns);        
+%     if isempty(answer) % user hit cancel
+%         return
+%     elseif strcmp(answer{1},'') % if user left field blank
+%         return
+%     else % user put something in the field
+%         % check for legal input
+%         testEar = answer{1}; % voltage rms must be positive
+%         if strcmp(testEar,'left')
+%             testEar = 'Left';
+%         end
+%         if strcmp(testEar,'right')
+%             testEar = 'Right';
+%         end
+%         if ~(strcmp(testEar,'Left') | strcmp(testEar,'Right'))
+%             disp('Error: Invalid input. Must be Left or Right.')
+%             return
+%         end
+%     end
+% end
+% 
+% % get probe settings
+% validateStimLevels = [];
+% [probeInputL,probeOutputL,probeInputR,probeOutputR,~] = getProbeSettings(probeL,probeR,validateStimLevels);
+% % get most recent calibration files -----
+% if isempty(obj)
+%     tempobj = struct;
+%     tempobj.map = [];
+% else
+%     tempobj = obj;
+% end    
+% micCorrectionL = getMicCorrection(probeInputL,doMicCorrection,tempobj.map);
+% micCorrectionR = getMicCorrection(probeInputR,doMicCorrection,tempobj.map);
+% if doMicCorrection==1
+%     if ~isempty(probeInputL)
+%         if micCorrectionL == 1
+%             warning('MIC CORRECTION IS NOT BEING APPLIED!')
+%         end
+%     end
+%     if  ~isempty(probeInputR)
+%         if micCorrectionR == 1
+%             warning('MIC CORRECTION IS NOT BEING APPLIED!')
+%         end
+%     end
+% end
+% [C1L,C2L,calPath1L,calPath2L] = getOutputCal(calType,probeOutputL,tempobj.map);
+% [C1R,C2R,calPath1R,calPath2R] = getOutputCal(calType,probeOutputR,tempobj.map);
+% 
+% % PERFORM IN-SITU CALIBRATION -----
+% fmin = 100;
+% fmax = 18000;
+% disp('----- Running in-situ calibration -----')
+% inSituReps = 6;
+% doIndividual = 1;
+% doSimultaneous = 0;
+% if ~(isempty(probeL) | isempty(probeR)) % if both ears are being tested
+%     [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
+%     [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
+% elseif ~(isempty(probeL))
+%     [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
+%     iscS1R = [];
+%     iscS2R = [];
+% elseif ~(isempty(probeR))
+%     [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
+%     iscS1L = [];
+%     iscS2L = [];
+% end
+% % [iscS1L,iscS2L,~] = ARLas_runISC(obj.arlasObj,probeInputL,probeOutputL,calPath1L,calPath2L,calType,fmin,fmax,micCorrectionL,inSituReps,doIndividual,doSimultaneous);
+% % [iscS1R,iscS2R,~] = ARLas_runISC(obj.arlasObj,probeInputR,probeOutputR,calPath1R,calPath2R,calType,fmin,fmax,micCorrectionR,inSituReps,doIndividual,doSimultaneous);
+% % 
+% % these strucures will be used to apply the in-situ calibration
+% obj.iscS1L = iscS1L;
+% obj.iscS2L = iscS2L;
+% obj.iscS1R = iscS1R;
+% obj.iscS2R = iscS2R;
+% obj.probeInputL = probeInputL;
+% obj.probeInputR = probeInputR;
+% obj.probeOutputL = probeOutputL;
+% obj.probeOutputR = probeOutputR;
+
+            %obj.audiogramData.probeOutput = obj.probeOutput;
+            %obj.audiogramData.probeOutputR = obj.probeOutputR;
+            %obj.audiogramData.probeInputL = obj.probeInputL;
+            %obj.audiogramData.probeInputR = obj.probeInputR;
+
+    
