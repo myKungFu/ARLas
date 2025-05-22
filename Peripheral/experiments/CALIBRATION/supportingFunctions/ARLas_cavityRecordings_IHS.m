@@ -33,9 +33,10 @@ function [] = ARLas_cavityRecordings_IHS(varargin)
     cavityTemperature = params.cavityTemperature;
     
     nReps = 64; %128; % number of stimulus repetitions; recommend ~48
-    cavityLengths = [2.9; 3.6; 4.15; 5.2; 6.9]; % cavity lengths (cm) -- the custom set is fixed at these lengths
+    %cavityLengths = [2.9; 3.6; 4.15; 5.2; 6.9]; % cavity lengths (cm) -- the custom set is fixed at these lengths
     % extra value is added to the desired length to account for insertion of the tip 
-    adjust = -0.4; % (cm); reduction due to insertion of the probe tip
+    cavityLengths = [2.5; 3.2; 3.8; 4.8; 6.5]; % cavity lengths (cm) -- the custom set is fixed at these lengths
+    adjust = 0; %-0.4; % (cm); reduction due to insertion of the probe tip
     cavityLengths = cavityLengths + adjust;
 
     cavityDiameter = 0.8; % ER10x cavity diameter (cm)
@@ -49,9 +50,9 @@ function [] = ARLas_cavityRecordings_IHS(varargin)
     end
     
     [inputs,outputs] = hardwareSetup; %hardwareSetup; % read in the saved hardware setup
-    if strcmp(testProbe,'B')
-        input = inputs{2};        % ER10xA microphone
-        output = outputs{2};      % ER10xA loudspeakers
+    if strcmp(testProbe,'A')
+        input = inputs{1};        % ER10xA microphone
+        output = outputs{1};      % ER10xA loudspeakers
     % elseif strcmp(testProbe,'B')
     %     input = inputs{2};         % ER10xB microphone
     %     output = outputs{2};       % ER10xB loudspeakers

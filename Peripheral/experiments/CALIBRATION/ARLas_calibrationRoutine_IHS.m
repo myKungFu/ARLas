@@ -49,7 +49,7 @@ function [] = ARLas_calibrationRoutine_IHS(varargin)
     
     cavityTemperature = 32; % ~34(C); read this off of the 10X and update as needed
     fmin = 100;     % minimum frequency (Hz) over which to calculate fit
-    fmax = 18000;   % maximum frequency (Hz) over which to calculate fit
+    fmax = 20000;   % maximum frequency (Hz) over which to calculate fit
                             % NOTE: These are different from the stimulus chirp range.
                             % The above values allow you to perform a calibration over a sub-range of the
                             % frequencies that are in the calibration chirp, which always goes from 200-20000 Hz.
@@ -141,7 +141,7 @@ function [] = ARLas_calibrationRoutine_IHS(varargin)
         params.applyMicCorrection = 0; % note: thevenin calibration is performed without the mic calibration on!
         ARLas_cavityRecordings_IHS(obj,params) % perform Thevenin calibration
 
-        %insertMicCorrection(testProbe,obj.map) % put in the mic correction, recalculate, and save
+        insertMicCorrection(testProbe,obj.map) % put in the mic correction, recalculate, and save
     end
     
 end

@@ -25,29 +25,29 @@ function [inputs,outputs] = hardwareSetup()
     inputs{1}.label = 'OP24A'; % IHS OP24 extended bandwidth probe mic ("A" probe)
     inputs{1}.micSens = 0.5;   % sensitivity in V/Pa
     inputs{1}.gain = 0;        % amplifier gain in dB
-    inputs{1}.ch = 1;           % input channel being used on the sound card
+    inputs{1}.ch = 1;          % input channel being used on the sound card
 
     inputs{2}.label = 'OP24B'; % IHS OP24 extended bandwidth probe mic ("B" probe)
     inputs{2}.micSens = 0.5;   % sensitivity in V/Pa
     inputs{2}.gain = 0;        % amplifier gain in dB
-    inputs{2}.ch = [];           % input channel being used on the sound card -- NOT CURRENTLY USED!
+    inputs{2}.ch = 2;         % input channel being used on the sound card -- NOT CURRENTLY USED!
 
     inputs{3}.label = '250118'; % G.R.A.S 1/8" Pressure Mic, Type 40DP
     inputs{3}.micSens =0.00088; % sensitivity in V/Pa (shawns)
     inputs{3}.gain = 0;         % amplifier gain in dB
-    inputs{3}.ch = 2;           % input channel on the sound card    
+    inputs{3}.ch = 3;           % input channel on the sound card    
 
     inputs{4}.label = 'ER7C';   % ER7C probe Mic
     inputs{4}.micSens = 0.05; % sensitivity in V/Pa
     inputs{4}.gain = 0;         % amplifier gain in dB
-    inputs{4}.ch = 6;           % input channel on the sound card        
+    inputs{4}.ch = 4;           % input channel on the sound card        
     
 % Specify Outputs  -------------------------------------------------------------------------
     outputs{1}.label = 'OP24A';  % IHS OP24 extended bandwdith loudspeakers ("A" probe)
-    outputs{1}.ch = [1,2];      % output channel(s) on the sound card
+    outputs{1}.ch = [1,2];       % output channel(s) on the sound card
 
     outputs{2}.label = 'OP24B';  % IHS OP24 extended bandwdith loudspeakers ("B" probe)
-    outputs{2}.ch = [];      % output channel(s) on the sound card -- NOT CURRENTLY USED!
+    outputs{2}.ch = [3,4];          % output channel(s) on the sound card -- NOT CURRENTLY USED!
 
 
 % OLD CODE ----------------------------------------------------------------

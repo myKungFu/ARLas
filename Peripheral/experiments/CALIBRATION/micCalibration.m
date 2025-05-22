@@ -5,7 +5,7 @@ function micCalibration(varargin)
 % Microphone calibration routine for 
 % Follows Siegel and Neely calibrations.
 %
-% All of these calibrations are saved in 'C:\myWork\ARLas\Peripheral\calibrations\micCals'
+% All of these calibrations are saved in 'C:\myWork2\ARLas\Peripheral\calibrations\micCals'
 % Each calibration is further saved in a sub-directory named by date in the form 'mm_dd_yyyy'.
 %
 % Author: Shawn S Goodman, PhD
@@ -46,7 +46,7 @@ function micCalibration(varargin)
 
 % -------------------------------------------------------------------------
     txt = ({'Place the sound source at one end of a coupler';'';...
-        'Place the condenser mice in the other end with the mic screen very close to the probe tube';'';...
+        'Place the condenser mic in the other end with the mic screen very close to the probe tube';'';...
         ''});
         choice = questdlg(txt,'Mic Cal','Continue','Cancel','Continue');
     if strcmp(choice,'Continue')
