@@ -18,8 +18,6 @@ obj = varargin{1}; % get the arlas object 2025
 
     subjID = obj.subjectID;
     arlas_audiometerGDM(subjID,subjAge,obj,probeL,probeR);
-arlas_audiometerGDM(subjID,subjAge,obj,probeL,probeR);
-arlas_audiometerGDM(subjID,subjAge,obj,probeL,probeR);
 end
 
 % OLD CODE ----------------------------------------------------------------
