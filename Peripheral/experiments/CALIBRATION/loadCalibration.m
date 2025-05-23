@@ -156,6 +156,28 @@ function [LC,iscCheckHandleA,iscCheckHandleB,OK] = loadCalibration(varargin)
     fileName = datestr(now, 'dd-mm-yyyy-HH-MM-ss');
     save([loadCalibrationsPath,fileName,'.mat'],'LC')
 
+
+% ----- 
+% insert files for fPTC here
+fff = LC.iscSA1.freq;
+fofpl = LC.iscSA1.fpl;
+FFF = [125,200,300,400,500,600,700,800,900,1000,1500,2000,3000,4000,5000,6000,8000,10000,12000,14000,16000,18000,20000]';
+for ii=1:length(FFF)
+    FO(ii,1) = interp1(fff,fofpl,FFF(ii),'pchip');    
+end
+FO(end) = FO(end-1);
+indx = find(FFF==1000);
+M = [FFF,round(FO)];
+PTCpath = 'C:\Users\Public\PSYCHOACOUSTICS\Headphones\';
+PTCname = obj.subjectID;
+writematrix(M,[PTCpath,PTCname,'.txt'],'Delimiter','space')
+
+txt = num2str(round(FO(indx)));
+cprintf([1,0.5,0],['Value for fPTC','\n']);
+cprintf([1,0.5,0],[txt,'\n']);
+
+% ----
+
     if doProbeFitCheck == 1
         [iscCheckHandleA,iscCheckHandleB,OK] = probeFitCheck(obj,LC,iscCheckHandleA,iscCheckHandleB);
     end
