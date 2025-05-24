@@ -1,0 +1,901 @@
+function [] = LRF(varargin)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LRF(varargin)
+%
+% Measure DPOAEs using fixed F2 and sweeping F1 (i.e., sweep the frequency
+% ratio).
+%
+% Author: Shawn Goodman, PhD
+% Auditory Research Lab, the University of Iowa
+% Original Date: January 3, 2025
+% Last Updated: January 3, 2025 -- ssg -- 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    obj = varargin{1}; % get the arlas object
+    V = '03JAN2025'; % this is the current version number of this program
+    tic
+%------ USER MODIFIABLE PARAMETERS ----------------------------------------
+%--------------------------------------------------------------------------
+
+    f2 = [1925]; % f1 frequency (Hz) 
+    nSweeps = 24; % number of test repeates 24 gives a good noise floor in humans when L2 = 65 and L1 = 55 dB FPL
+
+
+    Rmin = 1.01; % minimum f2/f1 ratio (must be >= 1), try 1.01
+    Rmax = 1.3; % maximum f2/f1 ratio (must be >= 1), try 1.3
+    L1 = 65; % f1 level (dB FPL)
+    L2 = 55; % f2 level (dB FPL)
+
+    doEPL = 0; % turn on and off EPL correction 
+    % Note: You now specify which probes and mic cal to use in loadCalibration.m
+
+%------ END USER MODIFIABLE PARAMETERS ------------------------------------
+%--------------------------------------------------------------------------
+
+    % perform load calibration
+    doProbeFitCheck = 1;
+    iscCheckHandleA = []; % figures not yet made so initialize handles to zero
+    iscCheckHandleB = [];
+    LC = []; % load calibration not yet done, so initialize to empty set
+    [LC,iscCheckHandleA,iscCheckHandleB,OK] = loadCalibration(obj,doProbeFitCheck,LC,iscCheckHandleA,iscCheckHandleB);
+    if OK == 0
+        disp('Error: Probe fit not okay. Aborting program.')
+        return
+    end
+
+    disp(' ')
+    disp('----- Starting DPOAE experiment: LRF -----')
+    %disp(['Estimated Test Length = ',num2str(testLength/60),' min.'])
+
+
+    % edge effects mean that you need to extend the range a bit (sweepRate * 0.5)
+    Rmin = Rmin - .01;
+    Rmax = Rmax + .01;
+
+    targetL1 = L1 * ones(size(f2)); % target levels for fixed L1 primaries (dB FPL);
+    targetL2 = L2 * ones(size(f2)); % target levels for fixed L1 primaries (dB FPL);
+
+    % COLLECT THE DATA --------------------------------------------------------
+    disp('----- Collecting data -----')
+    fs = obj.fs; % get the system sampling rate
+    nLevels = length(targetL1); % number of stim
+    adjust = 0; % level adjustment
+    
+    % Apply the in-situ calibration to the stimuli ----------------
+    nFreqs = length(f2);
+    
+    % Apply the in-situ calibration to the stimuli ------------------------
+    iscSA1 = LC.iscSA1;
+    iscSA2 = LC.iscSA2;
+    iscSB1 = LC.iscSB1;
+    iscSB2 = LC.iscSB2;
+    probeInputA = LC.probeInputA;
+    probeOutputA = LC.probeOutputA;
+    probeInputB = LC.probeInputB;
+    probeOutputB = LC.probeOutputB;
+    
+    for kk=1:nFreqs
+        fs = obj.fs;
+        sweepLength = 8; % sweep length in seconds
+        sweepN = round(fs*sweepLength);
+
+        [Y1,Y2,F1,F2,Fdp,Y1c,Y2c,Ydp,Ydpc,fmin,fmax,fRatios] = ARLas_dpoaeStim_sweepRatio(fs,f2(1),Rmin,Rmax,sweepN); % get the raw stimuli
+        sweepRate = (max(F1(:)) - min(F1(:))) / sweepLength; % f1 change in frequency per second. This will vary with f2 frequency 
+        testLength = sweepLength * nSweeps; % total test length (sec)
+        disp(['Test Length = ',num2str(testLength/60),' min.'])
+
+        if ~isempty(iscSA1)
+            [rows,cols] = size(Y1);
+            [SA1,scaling,errors1] = ARLas_applyISC(iscSA1,targetL1(kk)+adjust,'fpl',F1(:),Y1(:));
+            SA1 = Y1(:) .* abs(scaling(:));
+            SA1 = reshape(SA1,rows,cols);
+            [SA2,scaling,errors1] = ARLas_applyISC(iscSA2,targetL2(kk)+adjust,'fpl',F2(:),Y2(:));
+            SA2 = Y2(:) .* abs(scaling(:));
+            SA2 = reshape(SA2,rows,cols);
+            if kk==1
+                SA1full = SA1;
+                SA2full = SA2;
+            else
+                SA1full = SA1 + SA1full;
+                SA2full = SA2 + SA2full;
+            end                
+        else
+            SA1 = [];
+            SA2 = [];
+            SA1full = [];
+            SA2full = [];
+        end
+        if ~isempty(iscSB1)
+            [SB1,scaling,errors1] = ARLas_applyISC(iscSB1,targetL1(kk)+adjust,'fpl',F1(:),Y1(:));
+            SB1 = Y1(:) .* abs(scaling(:));
+            SB1 = reshape(SB1,rows,cols);
+            [SB2,scaling,errors1] = ARLas_applyISC(iscSB2,targetL2(kk)+adjust,'fpl',F2(:),Y2(:));
+            SB2 = Y2(:) .* abs(scaling(:));
+            SB2 = reshape(SB2,rows,cols);
+            if kk==1
+                SB1full = SB1;
+                SB2full = SB2;
+            else
+                SB1full = SB1 + SB1full;
+                SB2full = SB2 + SB2full;
+            end                
+        else
+            SB1 = [];
+            SB2 = [];
+            SB1full = [];
+            SB2full = [];            
+        end
+    end
+    SA1 = SA1full;
+    SA2 = SA2full;
+    SB1 = SB1full;
+    SB2 = SB2full;
+    %targetL2 = 20*log10(L2/.00002);
+    
+    % tell ARLas what to record and what to play --------------------------
+    obj.clearPlayList % clear out whatever was played previously
+    if ~isempty(probeInputA) % load new signals to play
+        obj.setPlayList(SA1,probeOutputA.ch(1));
+        obj.setPlayList(SA2,probeOutputA.ch(2));
+    end
+    if ~isempty(probeInputB)
+        obj.setPlayList(SB1,probeOutputB.ch(1));
+        obj.setPlayList(SB2,probeOutputB.ch(2));
+    end
+
+    obj.clearRecList % clear out whatever was used previously 
+    if ~isempty(probeInputA)
+        probeInputA.label = [probeInputA.label,'_LRF'];
+        obj.setRecList(probeInputA.ch,probeInputA.label,probeInputA.micSens,probeInputA.gain);    
+    end
+    if ~isempty(probeInputB)
+        probeInputB.label = [probeInputB.label,'_LRF'];
+        obj.setRecList(probeInputB.ch,probeInputB.label,probeInputB.micSens,probeInputB.gain);    
+    end
+
+    nSweeps = nSweeps(1); % all frequencies have the same number of sweeps
+    nReps = nSweeps * size(Y1,2); % number of reps (for ARLas, since stim folded into a matrix)
+    obj.setNReps(nReps); % number of times to play stimulus
+    obj.setFilter(1); % note: this is a highpass filter with a 75 Hz cutoff frequency.
+    
+    % Populate userInfo fields --------------------------------------------
+    obj.objPlayrec.userInfo = []; % clear out previous, non-structure array info
+    obj.objPlayrec.userInfo.dpoae_version = V; % this version of the test
+    obj.objPlayrec.userInfo.fs = fs; % sampling rate (Hz)
+    obj.objPlayrec.userInfo.LC = LC; % load calibration structure
+    obj.objPlayrec.userInfo.testEar = LC.testEar; % which ear is ACTUALLY being tested (has probe insertion), regardless of which probe is being used
+    obj.objPlayrec.userInfo.sweepLength = sweepLength; % length of each sweep (s)
+    obj.objPlayrec.userInfo.sweepLength = sweepN; % number of samples in each sweep (samples)
+    obj.objPlayrec.userInfo.sweepRate = sweepRate; % dB / sec
+    obj.objPlayrec.userInfo.nSweeps = nSweeps; % number of sweeps to collect
+    obj.objPlayrec.userInfo.nReps = nReps; % number of reps (for ARLas, since stim folded into a matrix)
+    obj.objPlayrec.userInfo.fmin = fmin; % min frequency being tested
+    obj.objPlayrec.userInfo.fmax = fmax; % max frequency being tested
+    obj.objPlayrec.userInfo.targetL1 = targetL1; % target levels
+    obj.objPlayrec.userInfo.targetL2 = targetL2; % target levels
+    obj.objPlayrec.userInfo.fRatios = fRatios; % f2 / f1 ratios
+    obj.objPlayrec.userInfo.L1 = L1; % L1 vector of levels across sweep
+    obj.objPlayrec.userInfo.L2 = L2; % L2 vector of levels across sweep
+    obj.objPlayrec.userInfo.F1 = F1; % f1 vector of frequencies across sweep (these are constant in this program)
+    obj.objPlayrec.userInfo.F2 = F2; % f2 vector of frequencies across sweep (these are constant in this program)
+    obj.objPlayrec.userInfo.Fdp = Fdp; % fdp vector of frequencies across sweep (these are constant in this program)
+    obj.objPlayrec.userInfo.fmin = fmin; % min frequency being tested
+    obj.objPlayrec.userInfo.fmax = fmax; % max frequency being tested
+    obj.objPlayrec.userInfo.Rmin = Rmin; % 0 min L2 (dB FPL) 
+    obj.objPlayrec.userInfo.Rmax = Rmax; % 70 max L2 (dB FPL)
+    obj.objPlayrec.userInfo.Y1 = Y1;
+    obj.objPlayrec.userInfo.Y2 = Y2;
+    obj.objPlayrec.userInfo.Ydp = Ydp;
+    obj.objPlayrec.userInfo.Y1c = Y1c;
+    obj.objPlayrec.userInfo.Y2c = Y2c;
+    obj.objPlayrec.userInfo.Ydpc = Ydpc;
+    obj.objPlayrec.userInfo.f2 = f2; % number of f2 frequencies to test
+
+
+    obj.objPlayrec.run % playback and record -----
+    if obj.killRun
+       return
+    end
+
+    % extract the recordings -----
+    if ~isempty(probeInputA)
+        [headerA,DataA] = obj.retrieveData(['Ch',num2str(probeInputA.ch)]); % retrive recorded data
+        if LC.doMicCorrection == 1
+            DataA = applyMicCorrection(DataA,LC.micCorrectionA);
+        end
+    end
+    if ~isempty(probeInputB)
+        [headerB,DataB] = obj.retrieveData(['Ch',num2str(probeInputB.ch)]); % retrive recorded data
+        if LC.doMicCorrection == 1
+            DataB = applyMicCorrection(DataB,LC.micCorrectionB);
+        end
+    end
+
+    % perform post-hoc load calibration -----
+    doProbeFitCheck = 1;
+    if ~isgraphics(iscCheckHandleA) % check to make sure window hasn't been shut down
+        iscCheckHandleA = []; % figures not yet made so initialize handles to zero
+    end
+    if ~isgraphics(iscCheckHandleB)
+        iscCheckHandleB = []; 
+    end
+    [LC2,iscCheckHandleA,iscCheckHandleB] = loadCalibration(obj,doProbeFitCheck,LC,iscCheckHandleA,iscCheckHandleB);
+        
+    % Analyze data ----------------------------------------------------
+    disp('----- Analyzing data -----')
+
+    try
+    if ~isempty(probeInputA)
+        DPOAE_A.subjID = obj.subjectID;
+        DPOAE_A.testType = 'LRF';
+        DPOAE_A.nSweeps = nSweeps;
+        DPOAE_A.L2 = L2;
+        DPOAE_A.F2 = F2;
+        DPOAE_A.Fdp = Fdp;
+        DPOAE_A.L1 = L1; % L1 vector of levels across sweep
+        DPOAE_A.L2 = L2; % L2 vector of levels across sweep
+        DPOAE_A.F1 = F1; % f1 vector of frequencies across sweep (these are constant in this program)
+        DPOAE_A.F2 = F2; % f2 vector of frequencies across sweep (these are constant in this program)
+        DPOAE_A.Fdp = Fdp; % fdp vector of frequencies across sweep (these are constant in this program)
+        DPOAE_A.fmin = fmin; % min frequency being tested
+        DPOAE_A.fmax = fmax; % max frequency being tested
+        DPOAE_A.Rmin = Rmin; % 0 min L2 (dB FPL) 
+        DPOAE_A.Rmax = Rmax; % 70 max L2 (dB FPL)
+        DPOAE_A.Y1 = Y1;
+        DPOAE_A.Y2 = Y2;
+        DPOAE_A.Ydp = Ydp;
+        DPOAE_A.Y1c = Y1c;
+        DPOAE_A.Y2c = Y2c;
+        DPOAE_A.Ydpc = Ydpc;
+        DPOAE_A.fRatios = fRatios;
+        DPOAE_A.f2 = f2;
+        DPOAE_A.doEPL = doEPL;
+        [DPOAE_A,h1A] = analyzeData(DataA,headerA,LC,DPOAE_A);
+    else
+        DPOAE_A = [];
+    end
+    catch ME
+        keyboard
+    end
+    try
+    if ~isempty(probeInputB)
+        DPOAE_B.subjID = obj.subjectID;
+        DPOAE_B.testType = 'LRF';
+        DPOAE_B.nSweeps = nSweeps;
+        DPOAE_B.L2 = L2;
+        DPOAE_B.F2 = F2;
+        DPOAE_B.Fdp = Fdp;
+        DPOAE_B.L1 = L1; % L1 vector of levels across sweep
+        DPOAE_B.L2 = L2; % L2 vector of levels across sweep
+        DPOAE_B.F1 = F1; % f1 vector of frequencies across sweep (these are constant in this program)
+        DPOAE_B.F2 = F2; % f2 vector of frequencies across sweep (these are constant in this program)
+        DPOAE_B.Fdp = Fdp; % fdp vector of frequencies across sweep (these are constant in this program)
+        DPOAE_B.fmin = fmin; % min frequency being tested
+        DPOAE_B.fmax = fmax; % max frequency being tested
+        DPOAE_B.Rmin = Rmin; % 0 min L2 (dB FPL) 
+        DPOAE_B.Rmax = Rmax; % 70 max L2 (dB FPL)
+        DPOAE_B.Y1 = Y1;
+        DPOAE_B.Y2 = Y2;
+        DPOAE_B.Ydp = Ydp;
+        DPOAE_B.Y1c = Y1c;
+        DPOAE_B.Y2c = Y2c;
+        DPOAE_B.Ydpc = Ydpc;
+        DPOAE_B.fRatios = fRatios;
+        DPOAE_B.f2 = f2;
+        DPOAE_B.doEPL = doEPL;
+        [DPOAE_B,h1B] = analyzeData(DataA,headerA,LC,DPOAE_A);
+    else
+        DPOAE_B = [];
+    end
+    catch ME
+        keyboard
+    end
+
+    % save analyses -------------------------------------------------------
+    saveProbeFitPlots(obj,LC,probeInputA,probeInputB,iscCheckHandleA,iscCheckHandleB)
+
+    if ~isempty(probeInputA)
+        saveAnalysisPlots(obj,LC,h1A,[])
+    end
+    if ~isempty(probeInputB)
+        saveAnalysisPlots(obj,LC,h1B,[])
+    end
+
+    saveMatFiles(obj,DPOAE_A,DPOAE_B)
+
+    % save excel sheets
+    nFreqs = length(DPOAE_A.f2);
+    for ii=1:nFreqs
+         DPOAE = DPOAE_A;
+         %stuff = DPOAE.(['f',num2str(DPOAE.f2(ii))]);
+         %DPOAE.jar = stuff.jar;
+         %DPOAE.L2max = stuff.L2max;
+         %DPOAE.L2cut = stuff.L2cut;
+         %DPOAE.indxCut = stuff.indxCut;
+         %DPOAE.f2 = num2str(DPOAE_A.f2(ii));
+         saveExcelFiles(obj,LC,DPOAE,DPOAE_B)
+    end
+
+    disp('----- Finished DPOAE experiment: LRF -----')
+
+end
+
+% INTERNAL FUNCTIONS ------------------------------------------------------
+function [Y1,Y2,F1,F2,Fdp,Y1c,Y2c,Ydp,Ydpc,fmin,fmax,fRatios] = ARLas_dpoaeStim_sweepRatio(fs,f2,Rmin,Rmax,sweepN)
+    foldLength = 0.1; % fold into a matrix with columns this length (sec)
+    foldN = round(foldLength * fs); % number of samples in each column
+    R = linspace(Rmin,Rmax,sweepN)'; % dB spacing, linear sweep
+
+    % add padding for ramps on and off
+    rampLen1 = 0.003; % 3 ms ramp on and off
+    rampN1 = round(fs * rampLen1);
+    rampLen2 = 0.003; 
+    rampN2 = round(fs * rampLen2);
+    pad1 = ones(rampN1,1)*min(R);
+    pad2 = ones(rampN2,1)*max(R);
+    fRatios = [pad1;R;pad2];
+
+    F2 = ones(size(fRatios))*f2; % f2 is fixed
+    F1 = F2 ./ fRatios; % get f1 vector of constant frequencies
+    Fdp = 2*F1-F2;
+   
+    fmin = min(F1(:)); % minimum frequency being tested
+    fmax = max(F2(:)); % maximum frequency being tested
+
+    N = length(F2); % recalculate new number of samples (after padding added)
+    phi1 = 0; % starting phase
+    phi2 = 0;
+    phiDP = 0;
+    y1 = zeros(N,1); % initialize output
+    y2 = zeros(N,1); % initialize output
+    ydp = zeros(N,1); % initialize output
+    y1c = zeros(N,1); % initialize output
+    y2c = zeros(N,1); % initialize output
+    ydpc = zeros(N,1); % initialize output
+
+    deltaT = 1/fs; % sampling period
+    % calculate stimuli
+    for ii=1:N
+        phaseChange1 = 2*pi* (deltaT * F1(ii));
+        phi1 = phi1 + phaseChange1;
+
+        phaseChange2 = 2*pi* (deltaT * F2(ii));
+        phi2 = phi2 + phaseChange2;
+
+        phaseChangeDP = 2*pi* (deltaT * Fdp(ii));
+        phiDP = phiDP + phaseChangeDP;
+
+        y1(ii,1) = sin(phi1);
+        y2(ii,1) = sin(phi2);
+        ydp(ii,1) = sin(phiDP);
+
+        y1c(ii,1) = cos(phi1);
+        y2c(ii,1) = cos(phi2);    
+        ydpc(ii,1) = cos(phiDP);
+    end
+    % ramp on and off
+    h = hann(rampN1*2);
+    h = h(1:rampN1);
+    y1(1:rampN1) = y1(1:rampN1) .* h; % stimulus in sine phase
+    y2(1:rampN1) = y2(1:rampN1) .* h;
+    ydp(1:rampN1) = ydp(1:rampN1) .* h;
+    y1c(1:rampN1) = y1c(1:rampN1) .* h; % stimulus in cosine phase
+    y2c(1:rampN1) = y2c(1:rampN1) .* h;
+    ydpc(1:rampN1) = ydpc(1:rampN1) .* h;
+    
+    h = hann(rampN2*2);
+    h = h(1:rampN2);
+    h = flipud(h);
+    y1(end-rampN2+1:end) = y1(end-rampN2+1:end) .* h;
+    y2(end-rampN2+1:end) = y2(end-rampN2+1:end) .* h;
+    ydp(end-rampN2+1:end) = ydp(end-rampN2+1:end) .* h;
+    y1c(end-rampN2+1:end) = y1c(end-rampN2+1:end) .* h;
+    y2c(end-rampN2+1:end) = y2c(end-rampN2+1:end) .* h;
+    ydpc(end-rampN2+1:end) = ydpc(end-rampN2+1:end) .* h;
+
+    % fold up the stimuli for efficient presentation
+    NN = length(y1);
+    nFolds = ceil(NN / foldN);
+    extra = mod(NN,foldN);
+    if extra ~= 0
+        pad = zeros(foldN - extra,1);
+        F1 = [F1;pad];
+        F2 = [F2;pad];
+        Fdp = [Fdp;pad];
+        y1 = [y1;pad];
+        y2 = [y2;pad];
+        ydp = [ydp;pad];
+        y1c = [y1c;pad];
+        y2c = [y2c;pad];
+        ydpc = [ydpc;pad];
+    end
+    Y1 = reshape(y1,foldN,nFolds);
+    Y2 = reshape(y2,foldN,nFolds);
+    Ydp = reshape(ydp,foldN,nFolds);
+    Y1c = reshape(y1c,foldN,nFolds);
+    Y2c = reshape(y2c,foldN,nFolds);
+    Ydpc = reshape(ydpc,foldN,nFolds);
+    F1 = reshape(F1,foldN,nFolds);
+    F2 = reshape(F2,foldN,nFolds);
+    Fdp = reshape(Fdp,foldN,nFolds);
+    %NN = length(y1);
+    %time = (0:1:NN-1)'/fs;
+    %Time = reshape(time,foldN,nFolds);
+end
+function [DPOAE,h1] = analyzeData(Data,header,LC,DPOAE)
+    nSweeps = DPOAE.nSweeps;
+    %L2 = DPOAE.L2;
+    fdp = DPOAE.Fdp;
+    fs = header.fs;
+
+    % reshape and bandpass filter from 0.4-20 kHz
+    Rows = length(Data(:))/nSweeps;
+    Data = reshape(Data,Rows,nSweeps);
+    b = getbpf; % fir filter coefficients                 
+    [Rows,Cols] = size(Data);
+    Data = Data(:);
+    Data = fastFilter(b,Data);
+    Data = reshape(Data,Rows,Cols);
+    
+    Y1 = header.userInfo.Y1;
+    Y1c = header.userInfo.Y1c;
+    Y2 = header.userInfo.Y2;
+    Y2c = header.userInfo.Y2c;
+    Ydp = header.userInfo.Ydp;
+    Ydpc = header.userInfo.Ydpc;
+    fRatios = header.userInfo.fRatios;
+    Rmin = header.userInfo.Rmin;
+    Rmax = header.userInfo.Rmax;
+    
+    Y1 = reshape(Y1,Rows,1);
+    Y1c = reshape(Y1c,Rows,1);
+    Y2 = reshape(Y2,Rows,1);
+    Y2c = reshape(Y2c,Rows,1);
+    Ydp = reshape(Ydp,Rows,1);
+    Ydpc = reshape(Ydpc,Rows,1);
+    %fRatios = reshape(fRatios,Rows,1);
+
+    F1 = DPOAE.F1;
+    F2 = DPOAE.F2;
+    Fdp = DPOAE.Fdp;
+    F1 = reshape(F1,Rows,1);
+    F2 = reshape(F2,Rows,1);
+    Fdp = reshape(Fdp,Rows,1);
+
+
+    % -------------------------------------------
+    frameLen = 0.5; % analysis frame length (s)
+    frameN = round(fs*frameLen); % number of samples in each frame
+    downsampledN = 100; % downsample the results to this number of samples
+    
+    step = (Rmax - Rmin) / (downsampledN-1); % step size for downsampled result
+    targets = (Rmin:step:Rmax)';
+    for ii=1:length(targets) % find sample location of each target
+        [~,indices(ii,1)] = min(abs(targets(ii)-fRatios));
+    end
+    nIterations = length(indices);
+    DPOAE.pcOverlap = median(diff(indices)) / frameN; % percent overlap between each successive analysis frame
+
+    % ----------------------------------------------
+    % create solution matrix for LSF
+    W = blackman(frameN); %ones(frameN,1); %hann(frameN);
+    frameN2 = ceil(frameN/2); % half-frame size (number of samples)
+    nSamples = size(Data,1); % total number of samples in each sweep
+    % bad results happen when the frames are not full. Remove partially
+    % filled frames
+    [~,lossIndx] = min(abs(indices - frameN2));
+    indices = indices(lossIndx:end-lossIndx);
+    
+    DPOAE.targetF2 = F2(indices);
+    DPOAE.targetF1 = F1(indices);
+    nIterations = length(indices);
+
+    hitCounter = 0;
+    for ii=1:nIterations % loop across frames
+        if mod(ii,10)==0
+            disp(['Analyzing frame ',num2str(ii),' of ',num2str(nIterations)])
+        end
+        start = indices(ii)-frameN2+1; % starting sample of current frame
+        finish = indices(ii)+frameN2; % ending sample of current frame
+        if start < 0 % handle frame run on and run off of the data matrix
+            finish = indices(ii)+frameN2;
+            Chunk = Data(1:finish,:);
+            Pad1 = zeros(abs(start)+1,nSweeps);
+            Chunk = [Pad1;Chunk];
+            w = W;
+            
+            pad1 = zeros(abs(start)+1,1);
+            chunkY1 = Y1(1:finish,:);
+            chunkY1 = [pad1;chunkY1];            
+            chunkY1c = Y1c(1:finish,:);
+            chunkY1c = [pad1;chunkY1c]; 
+            chunkY2 = Y2(1:finish,:);
+            chunkY2 = [pad1;chunkY2];            
+            chunkY2c = Y2c(1:finish,:);
+            chunkY2c = [pad1;chunkY2c];            
+            chunkYdp = Ydp(1:finish,:);
+            chunkYdp = [pad1;chunkYdp];            
+            chunkYdpc = Ydpc(1:finish,:);
+            chunkYdpc = [pad1;chunkYdpc]; 
+            %w(1:abs(start)) = 0;
+        elseif finish > nSamples
+            hitCounter = hitCounter + 1;
+            disp('hit')
+            extra = finish - nSamples;
+            Chunk = Data(start:end,:);
+            Pad1 = zeros(extra,nSweeps);
+            Chunk = [Chunk;Pad1];
+            w = W;
+
+            %pad1 = zeros(abs(start)+1,1);
+            pad1 = Pad1(:,1);
+            chunkY1 = Y1(start:end,:);
+            chunkY1 = [chunkY1;pad1]; 
+            chunkY1c = Y1c(start:end,:);
+            chunkY1c = [chunkY1c;pad1]; 
+            chunkY2 = Y2(start:end,:);
+            chunkY2 = [chunkY2;pad1];            
+            chunkY2c = Y2c(start:end,:);
+            chunkY2c = [chunkY2c;pad1];            
+            chunkYdp = Ydp(start:end,:);
+            chunkYdp = [chunkYdp;pad1];            
+            chunkYdpc = Ydpc(start:end,:);
+            chunkYdpc = [chunkYdpc;pad1]; 
+            %w(nSamples:end) = 0;
+        else
+            Chunk = Data(start:finish,:);
+            w = W;
+
+            chunkY1 = Y1(start:finish);
+            chunkY1c = Y1c(start:finish);
+            chunkY2 = Y2(start:finish);
+            chunkY2c = Y2c(start:finish);
+            chunkYdp = Ydp(start:finish);
+            chunkYdpc = Ydpc(start:finish);
+        end
+        X = [chunkY1,chunkY1c,chunkY2,chunkY2c,chunkYdp,chunkYdpc];
+        
+        % perform wLSF for each frame in each sweep separately.
+        try
+        for jj=1:nSweeps
+            [B(:,jj),yhat(:,jj),residuals(:,jj)] = OLSfit_internal(X,Chunk(:,jj),w);
+        end
+        catch ME
+            keyboard
+        end
+        % compute weighted coherent mean, noise floor (standard error) and snr
+        [signal(1,ii),nf(1,ii),snr(1,ii)] = bswSNR(B(1,:)); % for primary f1
+        [signal(2,ii),nf(2,ii),snr(2,ii)] = bswSNR(B(2,:)); % for primary f2
+        [signal(3,ii),nf(3,ii),snr(3,ii),ns] = bswSNR(B(3,:)); % for dpoae fdp
+        %bigB = [bigB;ns(:)];
+    end
+    targets = targets(1:size(signal,2));
+    
+    % apply EPL correction ------------------------------------------------
+    if DPOAE.doEPL == 1
+        keyboard
+        k1 = LC.iscSA1.eplCorrection;
+        k2 = LC.iscSA2.eplCorrection;
+        ff = LC.iscSA1.freq;
+        k = abs((k1 + k2)/2); % take the mean from each channel as the correction
+        k = meanSmoother(k,50); % smooth the epl correction
+        [~,indx] = min(abs(ff - fdp)); % find the closest correction value
+        k = k(indx);
+        signal = 10.^(signal/20)*0.00002; % put signal magnitude back into Pascals
+        signal = signal * abs(k); % multiply the signal magnitude by the epl magnitude correction
+        signal = 20*log10(signal/.00002); % put signal back into dB (now EPL)
+        % do the same thing to the noise floor
+        nf = 10.^(nf/20)*0.00002; 
+        nf = nf * abs(k); 
+        nf = 20*log10(nf/.00002);
+    end
+    % end EPL correction --------------------------------------------------
+
+    DPOAE.Ldp = signal(3,:)';
+    DPOAE.Ndp = nf(3,:)';
+    DPOAE.Ratios = targets;
+    DPOAE.L1_measured = signal(1,:)';
+    DPOAE.N1_measured = nf(1,:)';
+    DPOAE.L2_measured = signal(2,:)';
+    DPOAE.N2_measured = nf(2,:)';
+    DPOAE.LC = LC;
+    DPOAE.nSweeps = nSweeps;
+    DPOAE.hitCounter = hitCounter;
+
+    % PLOTTING ------------------------------------------------------------
+    h1 = figure;
+    hold on
+    plot(DPOAE.Ratios,DPOAE.Ldp,'b')
+    hold on
+    plot(DPOAE.Ratios,DPOAE.Ndp,'k')
+    xmin = Rmin;
+    xmax = Rmax;
+    xlim([xmin,xmax])
+    xlabel('Target Ratio')
+    ylabel('DPOAE Level (dB SPL)')
+    grid on
+    title([DPOAE.subjID,'LRF'])
+end
+function [] = saveProbeFitPlots(obj,LC,probeInputA,probeInputB,iscCheckHandleA,iscCheckHandleB)
+    disp('----- Saving Probe Fit Figures -----')
+    tempPath = LC.tempResultsPath;
+    try
+        if ~isempty(probeInputA)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            figureFileName = [obj.subjectID,'_inSituCal_','DPOAE_A_LGF','.fig'];
+            %figureFileName = ARLas_saveName(savePath,figureFileName);
+            savefig(iscCheckHandleA,[savePath,figureFileName])
+            figureFileName = [obj.subjectID,'_inSituCal_','DPOAE_A_LGF','.bmp'];
+            %figureFileName = ARLas_saveName(savePath,figureFileName);    
+            saveas(iscCheckHandleA,[savePath,figureFileName])
+            saveas(iscCheckHandleA,[tempPath,figureFileName])
+        end
+    catch
+        disp('Warning: One or more figures for DPOAE_A not saved!')        
+    end
+
+    try
+        if ~isempty(probeInputB)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            figureFileName = [obj.subjectID,'_inSituCal_','DPOAE_B_LGF','.fig'];
+            %figureFileName = ARLas_saveName(savePath,figureFileName);
+            savefig(iscCheckHandleB,[savePath,figureFileName])
+            figureFileName = [obj.subjectID,'_inSituCal_','DPOAE_B_LGF','.bmp'];
+            %figureFileName = ARLas_saveName(savePath,figureFileName);    
+            saveas(iscCheckHandleB,[savePath,figureFileName])
+            saveas(iscCheckHandleB,[tempPath,figureFileName])
+        end
+    catch
+       disp('Warning: One or more figures for DPOAE_B not saved!')
+    end
+end
+function [] = saveAnalysisPlots(obj,LC,h1,h2)
+    disp('----- Saving LGF Figures -----')
+    tempPath = LC.tempResultsPath;
+    try
+        if ~isempty(h1)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            figureFileName = [obj.subjectID,'DPOAE_LGF','.fig'];
+            figureFileName = ARLas_saveName(savePath,figureFileName);
+            savefig(h1,[savePath,figureFileName])
+            figureFileName = [obj.subjectID,'DPOAE_LGF','.bmp'];
+            figureFileName = ARLas_saveName(savePath,figureFileName);    
+            saveas(h1,[savePath,figureFileName])
+            saveas(h1,[tempPath,figureFileName])
+        end
+    catch
+        disp('Warning: One or more figures for DPOAE_LGF not saved!')        
+    end
+
+    try
+        if ~isempty(h2)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            figureFileName = [obj.subjectID,'DPOAE_MLE','.fig'];
+            figureFileName = ARLas_saveName(savePath,figureFileName);
+            savefig(h2,[savePath,figureFileName])
+            figureFileName = [obj.subjectID,'DPOAE_MLE','.bmp'];
+            figureFileName = ARLas_saveName(savePath,figureFileName);    
+            saveas(h2,[savePath,figureFileName])
+            saveas(h2,[tempPath,figureFileName])
+        end
+    catch
+       disp('Warning: One or more figures for DPOAE_MLE not saved!')
+    end
+end
+function [] = saveMatFiles(obj,DPOAE_A,DPOAE_B)
+    disp('----- Saving MAT files -----')
+    % mat files don't get saved to temp location
+    try
+        if ~isempty(DPOAE_A)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            fileName = [obj.subjectID,'DPOAE_A_LGF','.mat'];
+            figureFileName = ARLas_saveName(savePath,fileName);
+            save([savePath,fileName],'DPOAE_A')
+        end
+    catch
+        disp('Warning: Mat file for DPOAE_A_LGF not saved!')        
+    end
+    try
+        if ~isempty(DPOAE_B)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+            fileName = [obj.subjectID,'DPOAE_B_LGF','.mat'];
+            figureFileName = ARLas_saveName(savePath,fileName);
+            save([savePath,fileName],'DPOAE_B')
+        end
+    catch
+        disp('Warning: Mat file for DPOAE_B_LGF not saved!')        
+    end
+end
+function [] = saveExcelFiles(obj,LC,DPOAE_A,DPOAE_B)
+    % Write analysis to spreadsheet
+    disp('----- Writing Excel files -----')
+    warning off
+    tempPath = LC.tempResultsPath;
+    try
+        if ~isempty(DPOAE_A)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+
+            % ------
+            fileName = [obj.subjectID,'DPOAE_A_LGF','.xls'];
+            saveFileName = [fileName,'x'];
+            saveFileNameCSV = [obj.subjectID,'DPOAE_A_LGF','.csv'];
+            %sheetName = [num2str(round(DPOAE_A.f2)),' Hz'];
+            sheetName = [DPOAE_A.f2,' Hz'];
+            writematrix('Ratio',[savePath,saveFileName],'Sheet',sheetName,'Range','A1');
+            writematrix(DPOAE_A.Ratios,[savePath,saveFileName],'Sheet',sheetName,'Range','A2');
+            writematrix('Ldp_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','B1');
+            writematrix(DPOAE_A.Ldp,[savePath,saveFileName],'Sheet',sheetName,'Range','B2');
+            writematrix('Ln_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','C1');
+            writematrix(DPOAE_A.Ndp,[savePath,saveFileName],'Sheet',sheetName,'Range','C2');
+            % -----
+            %Read the .xlsx file
+            data = readtable([savePath,saveFileName]);
+            % Save the data as a .csv file
+            writetable(data,[tempPath,saveFileNameCSV]);
+
+        end
+    catch
+        disp('Warning: Mat file for DPOAE_A XLSX not saved!')        
+    end
+    try
+        if ~isempty(DPOAE_B)
+            savePath = [obj.savingGrace,obj.experimentID,'_analysis',obj.sep];
+            if exist(savePath,'dir') == 0 % if path does not exist
+                success = mkdir(savePath);
+                addpath(savePath)
+                if ~success
+                    warning('Unable to create new Experiment Directory: data save path')
+                end
+            end 
+
+            % -----
+            fileName = [obj.subjectID,'DPOAE_B_LGF','.xls'];
+            saveFileName = [fileName,'x'];
+            saveFileNameCSV = [obj.subjectID,'DPOAE_B_LGF','.csv'];
+            sheetName = [num2str(round(DPOAE_B.f2)),' Hz'];
+            writematrix('F2_dB_FPL',[savePath,saveFileName],'Sheet',sheetName,'Range','A1');
+            writematrix(DPOAE_B.targets,[savePath,saveFileName],'Sheet',sheetName,'Range','A2');
+            writematrix('Ldp_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','B1');
+            writematrix(DPOAE_B.signal,[savePath,saveFileName],'Sheet',sheetName,'Range','B2');
+            writematrix('Ln_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','C1');
+            writematrix(DPOAE_B.nf,[savePath,saveFileName],'Sheet',sheetName,'Range','C2');
+            writematrix('X_dB_FPL',[savePath,saveFileName],'Sheet',sheetName,'Range','D1');
+            writematrix(DPOAE_B.jar.X,[savePath,saveFileName],'Sheet',sheetName,'Range','D2');
+            writematrix('Z_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','E1');
+            writematrix(DPOAE_B.jar.Z,[savePath,saveFileName],'Sheet',sheetName,'Range','E2');
+            writematrix('Sz_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','F1');
+            writematrix(DPOAE_B.jar.Sz,[savePath,saveFileName],'Sheet',sheetName,'Range','F2');
+            writematrix('Yhat_dB_EPL',[savePath,saveFileName],'Sheet',sheetName,'Range','G1');
+            writematrix(DPOAE_B.jar.Yhat_mle,[savePath,saveFileName],'Sheet',sheetName,'Range','G2');
+            writematrix('Slope',[savePath,saveFileName],'Sheet',sheetName,'Range','H1');
+            writematrix(DPOAE_B.jar.Slope_mle,[savePath,saveFileName],'Sheet',sheetName,'Range','H2');
+            writematrix('MLE',[savePath,saveFileName],'Sheet',sheetName,'Range','I1');
+            writematrix(DPOAE_B.jar.mle(:),[savePath,saveFileName],'Sheet',sheetName,'Range','I2');
+            % -----
+            %Read the .xlsx file
+            data = readtable([savePath,saveFileName]);
+            % Save the data as a .csv file
+            writetable(data,[tempPath,saveFileNameCSV]);
+            
+        end
+    catch
+        disp('Warning: Mat file for DPOAE_B XLSX not saved!')        
+    end
+    warning on
+end
+function b = getbpf()
+    Fs = 96000;
+    Fstop1 = 100;             % First Stopband Frequency 
+    Fpass1 = 400;            % First Passband Frequency -->for a low freq of 750, the dp is 450 Hz
+    Fpass2 = 20000;           % Second Passband Frequency
+    Fstop2 = 24000;           % Second Stopband Frequency
+    Dstop1 = 0.001;           % First Stopband Attenuation
+    Dpass  = 0.057501127785;  % Passband Ripple
+    Dstop2 = 0.0001;          % Second Stopband Attenuation
+    flag   = 'scale';         % Sampling Flag
+    % Calculate the order from the parameters using KAISERORD.
+    [N,Wn,BETA,TYPE] = kaiserord([Fstop1 Fpass1 Fpass2 Fstop2]/(Fs/2), [0 ...
+                                 1 0], [Dstop1 Dpass Dstop2]);
+    if mod(N,2)~= 0
+        N = N + 1;
+    end
+    b  = fir1(N, Wn, TYPE, kaiser(N+1, BETA), flag)';
+end
+function [B,yhat,residuals] = OLSfit_internal(X,data,w)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [B,yhat,residuals] = OLSfit_internal(X,data,w,t)
+%
+% Ordinary Least-Squares Regression for the model
+% y = a + b1*X1 + b2*X2 + ... + bk*Xk.
+% X = matrix of independent variables.
+% y = vector of dependent variables.
+% w = vector of weighting values (optional input)
+%
+% Author: Shawn Goodman, PhD
+% Auditory Research Lab, the University of Iowa
+% Date: March 7, 2022
+% Last Updated: July 20, 2023 -- ssg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    y = data;
+    X = [X,ones(size(X,1),1)]; % solution matrix
+    [rows,columns] = size(X); % size of the solution matrix
+    %k = columns-1; % k is the number of IV (the column of ones for y-intercept/dc offset is not counted)
+    %n = rows; % number of observations
+    
+    if ~isempty(w) % if a weighting vector exists...
+        w = w(:); % vectorize as a column vector...
+        sqrtw = sqrt(w); % ...and take the square root
+        X = repmat(sqrtw,1,columns).*X; % replicate sqrtw to matrix the size of X; J is the weighted version of X
+        y = sqrtw.*y; % Dy is the weighted version of y
+    end
+    
+    % Solve the least squares problem
+    [Q,R] = qr(X,0); % orthogonal-triangular decomposition; R is the Cholesky factor of the X matrix
+                     % the input argument 0 makes an "economy sized" decomposition, so that
+                     % [nSamples,nIVs] = size(Q), and 
+                     % [nIvs,nIVs] = size(R).
+    b = full(R\(Q'*y)); % Same as p = D*X\(D*y); b is a vector of coefficients; also same as b = (X'*X)\(X'*Y).
+    yhat = X*b;      % Predicted responses at each data point.
+    residuals = y - yhat;
+
+    b = b(1:end-1); % throw away dc offset
+    % loop to put cosine and sine parts into complex form
+    counter = 1; 
+    for ii=1:2:length(b)
+        B(counter,1) = b(ii) + 1i*b(ii+1); 
+        counter = counter + 1; 
+    end 
+
+end
+
+
+% OLD CODE ----------------------------------------------------------------
