@@ -62,7 +62,7 @@ function [] = DPgram(varargin)
     sweepRate = 0.5; % sweep rate in octaves/s; should be 0.5.
 
     doEPL = 0; % turn on and off EPL correction 
-    Sammi = 0; % turn on and off Sammi Ginter correction
+    Sammi = 1; % turn on and off Sammi Ginter correction
     % Note: You now specify which probes and mic cal to use in loadCalibration.m
                     
 %------ END USER MODIFIABLE PARAMETERS ------------------------------------

@@ -32,7 +32,6 @@ function [] = LGF(varargin)
     L2max = 70; % 70 max L2 (dB FPL)
 
     doEPL = 0; % turn on and off EPL correction 
-
     % Note: You now specify which probes and mic cal to use in loadCalibration.m
 
 %------ END USER MODIFIABLE PARAMETERS ------------------------------------
@@ -170,7 +169,6 @@ adjust = 0; % hard coded 4/21/2025 ssg
 
     nSweeps = nSweeps(1); % all frequencies have the same number of sweeps
     nReps = nSweeps * size(Y1,2); % number of reps (for ARLas, since stim folded into a matrix)
-    
     obj.setNReps(nReps); % number of times to play stimulus
     obj.setFilter(1); % note: this is a highpass filter with a 75 Hz cutoff frequency.
     
@@ -239,10 +237,6 @@ adjust = 0; % hard coded 4/21/2025 ssg
     % Analyze data ----------------------------------------------------
     disp('----- Analyzing data -----')
 
-    % note: saving done by the analyzing program?
-    % make analyze all levels
-    % skip bootstrapping for now?
-    
     try
     if ~isempty(probeInputA)
         DPOAE_A.subjID = obj.subjectID;
@@ -277,23 +271,9 @@ adjust = 0; % hard coded 4/21/2025 ssg
     end
 
 
-    % save analyses, including:
-    % mat files
-    % excel files
-    % save to central location 
-
+    % save analyses -------------------------------------------------------
     saveProbeFitPlots(obj,LC,probeInputA,probeInputB,iscCheckHandleA,iscCheckHandleB)
-    
-    
-    
-    
-    saveMatFiles(obj,DPOAE_A,DPOAE_B)    % if ~isempty(probeInputA)
-    %     saveAnalysisPlots(obj,LC,h1A,h2A)
-    % end
-    % if ~isempty(probeInputB)
-    %     saveAnalysisPlots(obj,LC,h1B,h2B)
-    % end
-
+    saveMatFiles(obj,DPOAE_A,DPOAE_B)
 
     % save excel sheets
     nFreqs = length(DPOAE_A.f2);
@@ -307,8 +287,6 @@ adjust = 0; % hard coded 4/21/2025 ssg
          DPOAE.f2 = num2str(DPOAE_A.f2(ii));
          saveExcelFiles(obj,LC,DPOAE,DPOAE_B)
     end
-
-    %saveExcelFiles(obj,LC,DPOAE_A,DPOAE_B)
 
     disp('----- Finished DPOAE experiment: LGF -----')
 
