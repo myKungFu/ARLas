@@ -16,7 +16,7 @@ function [] = LRF(varargin)
 %------ USER MODIFIABLE PARAMETERS ----------------------------------------
 %--------------------------------------------------------------------------
 
-    f2Freqs = [500,1000,2000]; % f1 frequency (Hz) 
+    f2Freqs = [500,1000,2000]; % f2 frequency (Hz) 
     nSweeps = 2; % number of test repeates 24 gives a good noise floor in humans when L2 = 65 and L1 = 55 dB FPL
 
 
