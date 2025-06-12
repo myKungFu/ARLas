@@ -17,7 +17,7 @@ function [] = LRF(varargin)
 %--------------------------------------------------------------------------
 
     f2Freqs = [500,1000,2000]; % f2 frequency (Hz) 
-    nSweeps = 2; % number of test repeates 24 gives a good noise floor in humans when L2 = 65 and L1 = 55 dB FPL
+    nSweeps = 24; % number of test repeates 24 gives a good noise floor in humans when L2 = 65 and L1 = 55 dB FPL
 
 
     Rmin = 1.01; % minimum f2/f1 ratio (must be >= 1), try 1.01
